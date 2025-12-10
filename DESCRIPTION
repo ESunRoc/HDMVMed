@@ -3,7 +3,7 @@ Title: High-dimensional Multivariate Causal Mediation Model
 Version: 0.1.0
 Authors@R: 
     person("Eli", "Sun", , "eli_sun@urmc.rochester.edu", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Description: Estimate the direct and indirect mediation effects with a set of high-dimensional mediators onto a set of 		correlated, possibly high-dimensional outcomes. Sun, E., Xiao, J., and Wu, T.T. (2025). Causal Mediation Analysis 	for Multiple Outcomes and High-dimensional Mediators: Identification, Inference, and Application. (Biometrics: 		In review).
 License: GPL (>=2)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
