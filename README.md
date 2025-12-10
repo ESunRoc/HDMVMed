@@ -5,7 +5,7 @@ mediator-wise partial indirect effects (PIDEs). Bootstrap p-values as well as BC
 percentile-based bootstrap confidence intervals are additionally provided following the framework of
 Sun et al. (2026). For the simulation code and OMEI application results discussed in the paper,
 please refer to the repo [https://github.com/ESunRoc/HDMVMediation](https://github.com/ESunRoc/HDMVMediation) 
-and accompanying [GitHub website](esunroc.github.io/HDMVMediation/).
+and accompanying GitHub website, [esunroc.github.io/HDMVMediation/](esunroc.github.io/HDMVMediation/).
 
 
 # Install
