@@ -26,13 +26,10 @@ to install the necessary package.
 
 
 
-
-
-
 # References
 
 Li, Y., Nan, B., and Zhu, J. (2016). MSGLasso: Multivariate Sparse Group Lasso for the Multivariate Multiple Linear Regression with an Arbitrary
 Group Structure. R package version 2.1, <https://CRAN.R-project.org/package=MSGLasso>.
 
-Sun E., Xiao J., and Wu T.T. (2026). Causal Mediation Analysis for Multiple Outcomes and High-dimensional Mediators: 
-Identification, Inference, and Application.
+Sun, E., Xiao, J., and Wu, T.T. (2026). Causal Mediation Analysis for Multiple Outcomes and High-dimensional Mediators: 
+Identification, Inference, and Application. Biometrics. Submitted.
