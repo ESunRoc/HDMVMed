@@ -1,0 +1,21 @@
+#' Example data set for fitting HDMVMediation
+#'
+#' `hdmvmed_test_data` contains a simulated data set that can be used to test/understand the high-dimensional multivariate mediation model of Sun et al. (2026).
+#'
+#' @name hdmvmed_test_data
+#'
+#' @format A matrix with 250 observations and 111 columns:
+#' \describe{
+#' \item{A}{A binary treatment/exposure indicator}
+#' \item{Y1,...,Y5}{Normally distributed outcomes}
+#' \item{M1,...,M100}{100 candidate mediators}
+#' \item{U1,...,U5}{Five confounders}
+#' }
+#'
+#' @description
+#' A toy data set with one binary treatment, five continuous and correlated outcomes, 100 candidate mediators, and five confounders.
+#' The true direct effects are (-3, 5, 5, -6, 4); the true TIDEs are (-20, 20, -20, -35, 15); and the true PIDEs are, by-response,
+#' (25, -20, -15, -30, 20, 0, ..., 0) for Y1, (20, 30, -25, -25, 20, 0, ..., 0) for Y2, (20, -15, -30, -20, 25, 0, ..., 0) for Y3,
+#' (-15, -20, -15, 30, -15, 0, ..., 0) for Y4, and (30, 15, 20, -25, -25, 0, ..., 0) for Y5.
+#'
+NULL
