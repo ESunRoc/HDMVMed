@@ -70,6 +70,7 @@ A \eqn{(p*q+2*q)\times 8} matrix \code{mod_boot_summ} with columns:
 \code{bootstrap_model} is the main function for fitting and performing inference for the high-dimensional multivariate outcomes mediation model of Sun, Xiao, and Wu (2025).
 }
 \examples{
+\dontrun{
 ## Load toy data
 data(hdmvmed_test_data)
 
@@ -83,6 +84,7 @@ outcomes <- hdmvmed_test_data[,2:6]
 model_fit <- bootstrap_model(mediators = mediators, confounders = confounders,
                              trt = trt, outcomes = outcomes, nB = 10)
 model_fit
+}
 
 }
 \references{

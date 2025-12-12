@@ -1,12 +1,13 @@
 #' Summary table for HDMVMediation models
 #'
-#' `hdmvm_table()` converts the matrix output of the main `bootstrap_model()` function into a searchable/filterable html table using the `DT` package.
+#' `hdmvm_table()` converts the matrix output of the main [bootstrap_model()] function into a searchable/filterable html table using the `DT` package.
 #'
-#' @param mod_boot_summ A numeric matrix; the output from `bootstrap_model()`
+#' @param mod_boot_summ A numeric matrix; the output from [bootstrap_model()]
 #' @param p An integer representing the number of candidate mediators
 #' @param outcomes A character vector with the names of each outcome
+#' @param DT_table A boolean indicating whether to return a DT table
 #'
-#' @returns An html widget of class `datatables`.
+#' @returns Either an html widget of class `datatables` (if `DT_table = TRUE`) or the equivalent dataframe (if `DT_table = FALSE`). The latter is used when constructing a DAG with the function `to_DAG()`.
 #'
 #' @examples
 #'\dontrun{
@@ -28,13 +29,13 @@
 #'}
 #'
 #' @export
-hdmvm_table <- function(mod_boot_summ, p, outcomes){
+hdmvm_table <- function(mod_boot_summ, p, outcomes, DT_table = TRUE){
   mod_boot_summ <- as.data.frame(mod_boot_summ)
 
   bca_inter <- paste0("(",round(mod_boot_summ$bca_lowerCL,4),", ",round(mod_boot_summ$bca_upperCL,4),")")
   per_inter <- paste0("(",round(mod_boot_summ$per_lowerCL,4),", ",round(mod_boot_summ$per_upperCL,4),")")
 
-  mod_boot_outcome <- rep(outcomes, each = p+2)
+  mod_boot_outcome <- c(rep(outcomes, each = p), rep(outcomes, 2))
 
   mod_boot_table_df <- data.frame("Outcome" = mod_boot_outcome,
                                   "Estimand" = gsub("(_resp[1-9])", "", gsub("(_ide_resp[1-9])", "", rownames(mod_boot_summ))),
@@ -47,9 +48,12 @@ hdmvm_table <- function(mod_boot_summ, p, outcomes){
   # mod_boot_table_df_print <- mod_boot_table_df[which(mod_boot_table_df$Orig..Est.!=0),]
   mod_boot_table_df_print <- mod_boot_table_df
 
-  DT::datatable(mod_boot_table_df_print, rownames = F,
+  if(DT_table){
+    DT::datatable(mod_boot_table_df_print, rownames = F,
                 colnames = c("Outcome", "Estimand", "Orig. Est.",
                              "Mean(boot)", "sd(boot)", "p-value",
                              "BCa CI", "PBCI"))
-  # clipr::write_clip(knitr::kable(mod_boot_table_df_print, digits = 4, format = "latex", align = "c"))
+  } else{
+    return(mod_boot_table_df_print)
+  }
 }

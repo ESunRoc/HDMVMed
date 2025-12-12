@@ -7,5 +7,5 @@
 #' @importFrom foreach `%dopar%` foreach
 #' @importFrom doParallel registerDoParallel
 #' @importFrom parallel detectCores makeCluster stopCluster
-#' @importFrom stats lm quantile sd
+#' @importFrom stats lm quantile sd median setNames
 NULL

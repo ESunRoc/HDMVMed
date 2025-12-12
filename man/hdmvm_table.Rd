@@ -4,20 +4,22 @@
 \alias{hdmvm_table}
 \title{Summary table for HDMVMediation models}
 \usage{
-hdmvm_table(mod_boot_summ, p, outcomes)
+hdmvm_table(mod_boot_summ, p, outcomes, DT_table = TRUE)
 }
 \arguments{
-\item{mod_boot_summ}{A numeric matrix; the output from \code{bootstrap_model()}}
+\item{mod_boot_summ}{A numeric matrix; the output from \code{\link[=bootstrap_model]{bootstrap_model()}}}
 
 \item{p}{An integer representing the number of candidate mediators}
 
 \item{outcomes}{A character vector with the names of each outcome}
+
+\item{DT_table}{A boolean indicating whether to return a DT table}
 }
 \value{
-An html widget of class \code{datatables}.
+Either an html widget of class \code{datatables} (if \code{DT_table = TRUE}) or the equivalent dataframe (if \code{DT_table = FALSE}). The latter is used when constructing a DAG with the function \code{to_DAG()}.
 }
 \description{
-\code{hdmvm_table()} converts the matrix output of the main \code{bootstrap_model()} function into a searchable/filterable html table using the \code{DT} package.
+\code{hdmvm_table()} converts the matrix output of the main \code{\link[=bootstrap_model]{bootstrap_model()}} function into a searchable/filterable html table using the \code{DT} package.
 }
 \examples{
 \dontrun{
