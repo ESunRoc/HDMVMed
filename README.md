@@ -16,13 +16,15 @@ devtools::install_github("ESunRoc/HDMVMed")
 
 Note that `HDMVMed` makes heavy usage of the `MSGLasso` package of Li et al. (2016). This package
 was removed from CRAN and therefore needs to be installed from the source files, which are available
-via the CRAN archive. Specifically, download the tarball `MSGLasso_2.1.tar.gz` [from the CRAN archive](https://cran.r-project.org/src/contrib/Archive/MSGLasso/)
+via the CRAN archive. This is true for `coxed` package, as well, from which we use the `bca` function. 
+Specifically, download the tarballs [`MSGLasso_2.1.tar.gz`](https://cran.r-project.org/src/contrib/Archive/MSGLasso/) and [`coxed_0.3.3.tar.gz`](https://cran.r-project.org/src/contrib/Archive/coxed/)
 and then run
 ```
 # install.packages("rtools")
 install.packages(path_to_MSGLasso_2.1.tar.gz, repos = NULL, type = "source")
+install.packages(path_to_coxed_0.3.3.tar.gz, repos = NULL, type = "source")
 ```
-to install the necessary package.
+to install the necessary packages.
 
 
 

@@ -10,8 +10,8 @@ bootstrap_model(
   trt,
   outcomes,
   quiet_msglasso = TRUE,
-  lam1.v = seq(0.001, 0.05, length = 20),
-  lamG.v = seq(0.001, 0.05, length = 20),
+  lam1.v = seq(0.001, 0.05, length = 10),
+  lamG.v = seq(0.001, 0.05, length = 10),
   alpha = 0.05,
   nB = 5000,
   msg_folds = 5,
@@ -33,15 +33,15 @@ bootstrap_model(
 
 \item{quiet_msglasso}{A boolean indicator determining whether or not the CV progress of the MSGLasso estimation should be suppressed; defaults to \code{TRUE}.}
 
-\item{lam1.v}{A numeric vector of component-wise regularization parameters as in the MSGLasso of Li et al. (2015). By default, this is taken to be \code{seq(from = 1e-03, to = 0.05, length = 20)}.}
+\item{lam1.v}{A numeric vector of component-wise regularization parameters as in the MSGLasso of Li et al. (2015). By default, this is taken to be \code{seq(from = 1e-03, to = 0.05, length = 10)}.}
 
-\item{lamG.v}{A numeric vector of group-wise regularization parameters as in the MSGLasso of Li et al. (2015). By default, this is taken to be \code{seq(from = 1e-03, to = 0.05, length = 20)}.}
+\item{lamG.v}{A numeric vector of group-wise regularization parameters as in the MSGLasso of Li et al. (2015). By default, this is taken to be \code{seq(from = 1e-03, to = 0.05, length = 10)}.}
 
 \item{alpha}{A numeric between 0 and 1 denoting the confidence level for inference; defaults to 0.05.}
 
 \item{nB}{A numeric determining the number of bootstrap samples taken for inference. By default, 5000 samples will be used.}
 
-\item{msg_folds}{A numeric determining the number of CV folds to be used in tuning the MSGLasso regularization parameters. By default, this is taken to be 5.}
+\item{msg_folds}{A numeric determining the number of CV folds to be used in tuning the MSGLasso regularization parameters. By default, this is taken to be 3.}
 
 \item{seed}{An integer seed for reproducible bootstrap inference.}
 
