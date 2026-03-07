@@ -13,10 +13,15 @@
 #' @param nB A numeric determining the number of bootstrap samples taken for inference. By default, 5000 samples will be used.
 #' @param msg_folds A numeric determining the number of CV folds to be used in tuning the MSGLasso regularization parameters. By default, this is taken to be 3.
 #' @param seed An integer seed for reproducible bootstrap inference.
-#' @param outcome_grps A boolean indicator for whether or not there are any groups on the outcome variables. By default, there are no outcome groups so this argument is `FALSE`.
+#' @param theta_parallel A Boolean indicator for whether to compute the debiasing matrices in parallel. By default, this is `TRUE`.
+#' @param outcome_grps A Boolean indicator for whether or not there are any groups on the outcome variables. By default, there are no outcome groups so this argument is `FALSE`.
 #' @param NumOutGrps An integer denoting the number of outcome groups; default is `NULL` in keeping with the default `outcome_grps = FALSE`
 #' @param OutGrpStarts A vector of starting coordinates for the outcome groups. Equivalent to `R.Starts` from the `MSGLasso` package.
 #' @param OutGrpEnds A vector of ending coordinates for the outcome groups. Equivalent to `R.Ends` from the `MSGLasso` package.
+#' @param medi_grps A Boolean indicator for whether or not there are any groups on the mediators. By default, there are no mediator groups so this outcome is `FALSE`.
+#' @param NumMediGrps An integer denoting the number of mediator groups; default is `NULL` in keeping with the default `medi_grps = FALSE`.
+#' @param MediGrpStarts A vector of starting coordinates for the mediators groups. Equivalent to `G.Starts` from the `MSGLasso` package. Starts from 0 and runs to, at most, \eqn{p-1}.
+#' @param MediGrpEnds A vector of ending coordinates for the outcome groups. Equivalent to `G.Ends` from the `MSGLasso` package.
 #'
 #' @returns A \eqn{(p*q+2*q)\times 8} matrix `mod_boot_summ` with columns:
 #' * `OrigEst`: the original PIDE/TIDE/DE estimate;
@@ -28,6 +33,14 @@
 #' * `per_lowerCL`: the lower limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI;
 #' * `per_upperCL`: the upper limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI.
 #'
+#'
+#' @details
+#' The `MediGrpStarts` and `MediGrpEnds` can be structured as follows (`OutGrpStarts` and `OutGrpEnds` are analogous).
+#' Say you have \eqn{g} mediator groups, each with \eqn{p_1,\ldots,p_g} mediators. Then
+#' `MediGrpStarts=c(0, p_1, ..., p_{g-1})` and `MediGrpEnds=c(p_{1}-1, p_{2}-1, ..., p_g)`. In this way, \eqn{p_g\le p}.
+#' Critically, these index starting from 0 to be consistent with internal calls to `MSGLasso`.
+#'
+#'
 #' @references{
 #' Li, Y., Nan, B., and Zhu, J. (2015). Multivariate Sparse Group Lasso for the
 #' Multivariate Multiple Linear Regression with an Arbitrary Group Structure.
@@ -37,7 +50,7 @@
 #' @references{
 #' Sun, E., Xiao, J., and Wu, T. T. (2025). Causal Mediation Analysis for Multiple
 #' Outcomes and High-dimensional Mediators: Identification, Inference, and Application.
-#' \emph{Biometrics}. _Under Review._
+#' \emph{Biostatistics}. _Under Review._
 #' }
 #'
 #' @examples
@@ -60,12 +73,13 @@
 #' @export
 bootstrap_model <- function(mediators, confounders, trt, outcomes, quiet_msglasso = TRUE,
                             lam1.v = seq(1e-3, 0.05, length=10), lamG.v = seq(1e-3, 0.05, length=10),
-                            alpha = 0.05, nB = 5e3, msg_folds = 5, seed = 823543, outcome_grps = FALSE,
-                            NumOutGrps = NULL, OutGrpStarts = NULL, OutGrpEnds = NULL){
+                            alpha = 0.05, nB = 5e3, msg_folds = 5, seed = 823543, theta_parallel = TRUE,
+                            outcome_grps = FALSE, NumOutGrps = NULL, OutGrpStarts = NULL, OutGrpEnds = NULL,
+                            medi_grps = FALSE, NumMediGrps = NULL, MediGrpStarts = NULL, MediGrpEnds = NULL){
 
   if(msg_folds<=1) stop("You must use at least 2 folds for tuning MSGLasso")
 
-  k <- 1                      # number of exposures/treatments
+  k <- 1                 # number of exposures/treatments
   p <- ncol(mediators)   # number of mediators
   l <- ncol(confounders) # number of confounders
   q <- ncol(outcomes)    # number of responses
@@ -82,12 +96,20 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, quiet_msglass
   #### Mediators --> Outcomes ####
   P <- p + l + k; Q <- q
 
-  G <- p + 2 # Groups on X: p + 2; p mediator singleton groups + 1 confounder group + 1 treatment group
-  gmax <- 1 # each variable (resp or pred) belongs to only 1 group
-  cmax <- l # a group contains at most l variables (confounders form largest group)
-  GarrStarts <- c(0:(p-1), p,  p+l+1); GarrEnds <-   c(0:(p-1), p+l, p+l+2)
+  if(medi_grps){
+    G <- medi_grps + 2 # medi_grps + 1 confounder group + 1 treatment group
+    gmax <- 1 # each variable belongs to only 1 group; overlapping groups are not currently supported
+    cmax <- max(c(MediGrpEnds - MediGrpStarts, l))       # max num. of variables per covariate group
+    GarrStarts <- c(MediGrpStarts, p, p+l+1); GarrEnds <- c(MediGrpEnds, p+l, p+l+2) # non-null covariate groupings
+  } else {
+    G <- p + 2 # Groups on X: p + 2; p mediator singleton groups + 1 confounder group + 1 treatment group
+    gmax <- 1 # each variable (resp or pred) belongs to only 1 group
+    cmax <- l # a group contains at most l variables (confounders form largest group)
+    GarrStarts <- c(0:(p-1), p,  p+l+1); GarrEnds <- c(0:(p-1), p+l, p+l+2)
+  }
 
-  if(outcome_grps == T){
+
+  if(outcome_grps){
     R <- NumOutGrps                                    # Groups on Y: user-specified
     RarrStarts <- OutGrpStarts; RarrEnds <- OutGrpEnds # non-null response groupings
   } else{
@@ -121,14 +143,14 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, quiet_msglass
                                              Y = outcomes,
                                              grpWTs, Pen_L, Pen_G,
                                              PQgrps, GRgrps, lam1.v, lamG.v,
-                                             # grp_Norm = grp_Norm0,
+                                             grp_Norm = grp_Norm0,
                                              fold = msg_folds, seed = seed), file = nullfile())
   } else{
     mod_try.cv <- MSGLasso.cv(X = cbind(mediators,confounders,trt),
                               Y = outcomes,
                               grpWTs, Pen_L, Pen_G,
                               PQgrps, GRgrps, lam1.v, lamG.v,
-                              # grp_Norm = grp_Norm0,
+                              grp_Norm = grp_Norm0,
                               fold = msg_folds, seed = seed)
   }
 
@@ -148,8 +170,11 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, quiet_msglass
   # mod_Stage2_all <- rbind(mod_Stage2_debiased, mod_Stage2$Beta[(p+1):nrow(mod_Stage2$Beta),])
   # rownames(mod_Stage2_all) <- c(colnames(mediators), colnames(confounders), "Exposure")
 
-
-  theta_mod <- theta_calc_parallel(X = cbind(mediators, confounders, trt))
+  if(theta_parallel){
+    theta_mod <- theta_calc_parallel(X = cbind(mediators, confounders, trt))
+  } else {
+    theta_mod <- theta_calc(X = cbind(mediators, confounders, trt))
+  }
   mod_Stage2_debiased <- mod_Stage2$Beta + (1/n)*theta_mod%*%t(cbind(mediators, confounders, trt))%*%(outcomes - cbind(mediators, confounders, trt)%*%mod_Stage2$Beta)
   mod_Stage2_all <- mod_Stage2_debiased
   rownames(mod_Stage2_all) <- c(colnames(mediators), colnames(confounders), "Exposure")
