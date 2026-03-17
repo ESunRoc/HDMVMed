@@ -79,6 +79,12 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, quiet_msglass
 
   if(msg_folds<=1) stop("You must use at least 2 folds for tuning MSGLasso")
 
+  # Ensure that mediators, confounders, and outcomes are all named
+  if(is.null(colnames(mediators))) colnames(mediators) <- paste0("M", 1:ncol(mediators))
+  if(is.null(colnames(confounders))) colnames(confounders) <- paste0("C", 1:ncol(confounders))
+  if(is.null(colnames(outcomes))) colnames(outcomes) <- paste0("Y", 1:ncol(outcomes))
+
+
   k <- 1                 # number of exposures/treatments
   p <- ncol(mediators)   # number of mediators
   l <- ncol(confounders) # number of confounders

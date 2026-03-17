@@ -16,6 +16,7 @@ bootstrap_model(
   nB = 5000,
   msg_folds = 5,
   seed = 823543,
+  theta_parallel = TRUE,
   outcome_grps = FALSE,
   NumOutGrps = NULL,
   OutGrpStarts = NULL,
@@ -49,6 +50,8 @@ bootstrap_model(
 
 \item{seed}{An integer seed for reproducible bootstrap inference.}
 
+\item{theta_parallel}{A Boolean indicator for whether to compute the debiasing matrices in parallel. By default, this is \code{TRUE}.}
+
 \item{outcome_grps}{A Boolean indicator for whether or not there are any groups on the outcome variables. By default, there are no outcome groups so this argument is \code{FALSE}.}
 
 \item{NumOutGrps}{An integer denoting the number of outcome groups; default is \code{NULL} in keeping with the default \code{outcome_grps = FALSE}}
@@ -57,13 +60,13 @@ bootstrap_model(
 
 \item{OutGrpEnds}{A vector of ending coordinates for the outcome groups. Equivalent to \code{R.Ends} from the \code{MSGLasso} package.}
 
+\item{medi_grps}{A Boolean indicator for whether or not there are any groups on the mediators. By default, there are no mediator groups so this outcome is \code{FALSE}.}
+
+\item{NumMediGrps}{An integer denoting the number of mediator groups; default is \code{NULL} in keeping with the default \code{medi_grps = FALSE}.}
+
 \item{MediGrpStarts}{A vector of starting coordinates for the mediators groups. Equivalent to \code{G.Starts} from the \code{MSGLasso} package. Starts from 0 and runs to, at most, \eqn{p-1}.}
 
 \item{MediGrpEnds}{A vector of ending coordinates for the outcome groups. Equivalent to \code{G.Ends} from the \code{MSGLasso} package.}
-
-\item{medi_groups}{A Boolean indicator for whether or not there are any groups on the mediators. By default, there are no mediator groups so this outcome is \code{FALSE}.}
-
-\item{NumMediGroups}{An integer denoting the number of mediator groups; default is \code{NULL} in keeping with the default \code{medi_groups = FALSE}.}
 }
 \value{
 A \eqn{(p*q+2*q)\times 8} matrix \code{mod_boot_summ} with columns:
@@ -84,15 +87,11 @@ A \eqn{(p*q+2*q)\times 8} matrix \code{mod_boot_summ} with columns:
 \details{
 The \code{MediGrpStarts} and \code{MediGrpEnds} can be structured as follows (\code{OutGrpStarts} and \code{OutGrpEnds} are analogous).
 Say you have \eqn{g} mediator groups, each with \eqn{p_1,\ldots,p_g} mediators. Then
-\verb{MediGrpStarts=c(0, p_1, ..., p_\{g-1\})} and \verb{MediGrpEnds=c(p_\{1\}-1, p_\{2\}-1, ..., p_g)}.
+\verb{MediGrpStarts=c(0, p_1, ..., p_\{g-1\})} and \verb{MediGrpEnds=c(p_\{1\}-1, p_\{2\}-1, ..., p_g)}. In this way, \eqn{p_g\le p}.
 Critically, these index starting from 0 to be consistent with internal calls to \code{MSGLasso}.
 }
 \examples{
 \dontrun{
-## Example medi_groups; g mediator groups, each with p1, ..., pg mediators:
-# MediGrpStarts <- c(0,    p1,   ..., pg)
-# MediGrpEnds   <- c(p1-1, p2-1, ..., pg-1)
-
 ## Load toy data
 data(hdmvmed_test_data)
 
