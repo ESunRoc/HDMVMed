@@ -14,6 +14,7 @@
 #' @param msg_folds A numeric determining the number of CV folds to be used in tuning the MSGLasso regularization parameters. By default, this is taken to be 3.
 #' @param seed An integer seed for reproducible bootstrap inference.
 #' @param theta_parallel A Boolean indicator for whether to compute the debiasing matrices in parallel. By default, this is `TRUE`.
+#' @param penalize_conf A Boolean indicator for whether the confounder block should be unpenalized. By default, this is `FALSE`.
 #' @param outcome_grps A Boolean indicator for whether or not there are any groups on the outcome variables. By default, there are no outcome groups so this argument is `FALSE`.
 #' @param NumOutGrps An integer denoting the number of outcome groups; default is `NULL` in keeping with the default `outcome_grps = FALSE`
 #' @param OutGrpStarts A vector of starting coordinates for the outcome groups. Equivalent to `R.Starts` from the `MSGLasso` package.
@@ -74,8 +75,8 @@
 bootstrap_model <- function(mediators, confounders, trt, outcomes, quiet_msglasso = TRUE,
                             lam1.v = seq(1e-3, 0.05, length=10), lamG.v = seq(1e-3, 0.05, length=10),
                             alpha = 0.05, nB = 5e3, msg_folds = 5, seed = 823543, theta_parallel = TRUE,
-                            outcome_grps = FALSE, NumOutGrps = NULL, OutGrpStarts = NULL, OutGrpEnds = NULL,
-                            medi_grps = FALSE, NumMediGrps = NULL, MediGrpStarts = NULL, MediGrpEnds = NULL){
+                            penalize_conf = FALSE, outcome_grps = FALSE, NumOutGrps = NULL, OutGrpStarts = NULL,
+                            OutGrpEnds = NULL, medi_grps = FALSE, NumMediGrps = NULL, MediGrpStarts = NULL, MediGrpEnds = NULL){
 
   if(msg_folds<=1) stop("You must use at least 2 folds for tuning MSGLasso")
 
@@ -134,11 +135,13 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, quiet_msglass
 
 
   Pen_L <<- matrix(rep(1, P*Q), P, Q, byrow=T)
-  Pen_L[(p+1):P,] <- 0 # don't penalize the confounders, (p+1):(P-1), or treatment, P
 
   Pen_G <<- matrix(rep(1,G*R),G,R, byrow=TRUE)
-  Pen_G[(G-1):G,] <- 0 # don't penalize confounder group, G-1, or treatment group, G
 
+  if(penalize_conf == FALSE){ # if penalize_conf == FALSE,
+    Pen_L[(p+1):P,] <- 0 # don't penalize the confounders, (p+1):(P-1), or treatment, P
+    Pen_G[(G-1):G,] <- 0 # don't penalize confounder group, G-1, or treatment group, G
+  }
   grp_Norm0 <- matrix(rep(1, G*R), nrow=G, byrow=TRUE)
 
 
