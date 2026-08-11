@@ -17,6 +17,7 @@ bootstrap_model(
   msg_folds = 5,
   seed = 823543,
   theta_parallel = TRUE,
+  penalize_conf = FALSE,
   outcome_grps = FALSE,
   NumOutGrps = NULL,
   OutGrpStarts = NULL,
@@ -51,6 +52,8 @@ bootstrap_model(
 \item{seed}{An integer seed for reproducible bootstrap inference.}
 
 \item{theta_parallel}{A Boolean indicator for whether to compute the debiasing matrices in parallel. By default, this is \code{TRUE}.}
+
+\item{penalize_conf}{A Boolean indicator for whether the confounder block should be unpenalized. By default, this is \code{FALSE}.}
 
 \item{outcome_grps}{A Boolean indicator for whether or not there are any groups on the outcome variables. By default, there are no outcome groups so this argument is \code{FALSE}.}
 
