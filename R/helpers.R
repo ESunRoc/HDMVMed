@@ -237,10 +237,10 @@ theta_calc_parallel <- function(X, cores = parallel::detectCores()-1, folds = 5)
 #'
 #' Extract treatment x moderator interaction coefficients from a `broom::tidy()` summary of a multivariate `lm()` fit (i.e. a `mediators ~ trt + confounders + AxZ` model), one column per moderator and one row per mediator.
 #'
-#' @param `tidy_df` A data frame as returned by `broom::tidy()` on the mlm fit; must have `term` and `response` columns.
-#' @param `varname` String of the name of the interaction-matrix argument as it appears in the model formula (e.g. `"AxZ"` or `"AxZ_boot"`); this reproduces the term names R assigns to matrix predictors when combined with each entry of `int_colnames`
-#' @param `int_colnames` Character vector of the column names of the interaction matrix (one per moderator).
-#' @param `mediator_names` Character vector of mediator names; used to both size the output and to align rows by `response` rather than assuming row order, in case `tidy()`'s row order ever changes.
+#' @param tidy_df A data frame as returned by `broom::tidy()` on the mlm fit; must have `term` and `response` columns.
+#' @param varname A character string for the name of the interaction-matrix argument as it appears in the model formula (e.g. `"AxZ"` or `"AxZ_boot"`); this reproduces the term names R assigns to matrix predictors when combined with each entry of `int_colnames`
+#' @param int_colnames A character vector of the column names of the interaction matrix (one per moderator).
+#' @param mediator_names A character vector of mediator names; used to both size the output and to align rows by `response` rather than assuming row order, in case `tidy()`'s row order ever changes.
 #'
 #' @returns A `length(mediator_names)`-by-`length(int_colnames)` matrix.
 #'
@@ -251,12 +251,6 @@ extract_interaction_estimates <- function(tidy_df, varname, int_colnames, mediat
   colnames(out) <- int_colnames
   for(rz in seq_along(int_colnames)){
     term_name <- paste0(varname, int_colnames[rz])
-
-    # R's formula/model.matrix machinery does not append the column name when a
-    # matrix predictor has exactly one column (no ambiguity to resolve), so with a
-    # single moderator the term is just `varname` itself (e.g. "AxZ", not
-    # "AxZtrtxZ1"); fall back to that when the two-part name isn't present.
-
     if(!(term_name %in% tidy_df$term) && length(int_colnames) == 1L) term_name <- varname
     rows <- tidy_df[tidy_df$term == term_name, ]
     out[, rz] <- rows$estimate[match(mediator_names, rows$response)]

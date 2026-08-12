@@ -7,13 +7,13 @@
 extract_interaction_estimates(tidy_df, varname, int_colnames, mediator_names)
 }
 \arguments{
-\item{`tidy_df`}{A data frame as returned by \code{broom::tidy()} on the mlm fit; must have \code{term} and \code{response} columns.}
+\item{tidy_df}{A data frame as returned by \code{broom::tidy()} on the mlm fit; must have \code{term} and \code{response} columns.}
 
-\item{`varname`}{String of the name of the interaction-matrix argument as it appears in the model formula (e.g. \code{"AxZ"} or \code{"AxZ_boot"}); this reproduces the term names R assigns to matrix predictors when combined with each entry of \code{int_colnames}}
+\item{varname}{A character string for the name of the interaction-matrix argument as it appears in the model formula (e.g. \code{"AxZ"} or \code{"AxZ_boot"}); this reproduces the term names R assigns to matrix predictors when combined with each entry of \code{int_colnames}}
 
-\item{`int_colnames`}{Character vector of the column names of the interaction matrix (one per moderator).}
+\item{int_colnames}{A character vector of the column names of the interaction matrix (one per moderator).}
 
-\item{`mediator_names`}{Character vector of mediator names; used to both size the output and to align rows by \code{response} rather than assuming row order, in case \code{tidy()}'s row order ever changes.}
+\item{mediator_names}{A character vector of mediator names; used to both size the output and to align rows by \code{response} rather than assuming row order, in case \code{tidy()}'s row order ever changes.}
 }
 \value{
 A \code{length(mediator_names)}-by-\code{length(int_colnames)} matrix.

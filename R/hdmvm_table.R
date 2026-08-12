@@ -5,7 +5,7 @@
 #' @param mod_boot_summ A numeric matrix; the output from [bootstrap_model()]
 #' @param p An integer representing the number of candidate mediators
 #' @param outcomes A character vector with the names of each outcome
-#' @param p.adj.method A character string for the p-value correction method; see `\code{\link{stats::p.adjust}}`. Defaults to `"BH"`.
+#' @param p.adj.method A character string for the p-value correction method; see \link[stats]{p.adjust}. Defaults to `"BH"`.
 #' @param DT_table A boolean indicating whether to return a DT table
 #'
 #' @returns Either an html widget of class `datatables` (if `DT_table = TRUE`) or the equivalent dataframe (if `DT_table = FALSE`). The latter is used when constructing a DAG with the function `to_DAG()`. Includes a `Moderator` column identifying, for each row, which moderator (if any) the reported effect is indexed by; unmoderated PIDE/TIDE/DE rows show `"-"`.
