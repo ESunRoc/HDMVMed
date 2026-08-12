@@ -5,6 +5,7 @@
 #' @param mod_boot_summ A numeric matrix; the output from [bootstrap_model()]
 #' @param p An integer representing the number of candidate mediators
 #' @param outcomes A character vector with the names of each outcome
+#' @param p.adj.method A character string for the p-value correction method; see `\code{\link{stats::p.adjust}}`. Defaults to `"BH"`.
 #' @param DT_table A boolean indicating whether to return a DT table
 #'
 #' @returns Either an html widget of class `datatables` (if `DT_table = TRUE`) or the equivalent dataframe (if `DT_table = FALSE`). The latter is used when constructing a DAG with the function `to_DAG()`. Includes a `Moderator` column identifying, for each row, which moderator (if any) the reported effect is indexed by; unmoderated PIDE/TIDE/DE rows show `"-"`.
@@ -29,7 +30,9 @@
 #'}
 #'
 #' @export
-hdmvm_table <- function(mod_boot_summ, p, outcomes, DT_table = TRUE){
+hdmvm_table <- function(mod_boot_summ, p, outcomes, p.adj.method = "BH", DT_table = TRUE){
+  p.adj.method <- match.arg(p.adj.method)
+
   mod_boot_summ <- as.data.frame(mod_boot_summ)
 
   bca_inter <- paste0("(",round(mod_boot_summ$bca_lowerCL,4),", ",round(mod_boot_summ$bca_upperCL,4),")")
@@ -52,6 +55,8 @@ hdmvm_table <- function(mod_boot_summ, p, outcomes, DT_table = TRUE){
   base     <- sub("_MOD_.*$", "", stripped_resp)                # e.g. "M1_ide", "TIDE", "DE"
   estimand <- sub("_ide$", "", base)                            # "M1_ide" -> "M1"; "TIDE"/"DE" unaffected
 
+
+  pvals_adjusted <- p.adjust(mod_boot_summ$boot_pval, method = p.adj.method)
   mod_boot_table_df <- data.frame("Outcome" = mod_boot_outcome,
                                   "Estimand" = estimand,
                                   "Moderator" = moderator,
@@ -59,6 +64,7 @@ hdmvm_table <- function(mod_boot_summ, p, outcomes, DT_table = TRUE){
                                   "Mean(boot)" = round(mod_boot_summ$Mean_boot,4),
                                   "sd(boot)" = round(mod_boot_summ$boot_SE,4),
                                   "pval" = signif(mod_boot_summ$boot_pval,4),
+                                  "pval_adj" = signif(pvals_adjusted, 4),
                                   "BC_a CI" = bca_inter,
                                   "PBCI" = per_inter,
                                   check.names = FALSE)

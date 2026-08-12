@@ -4,7 +4,7 @@
 \alias{hdmvm_table}
 \title{Summary table for HDMVMediation models}
 \usage{
-hdmvm_table(mod_boot_summ, p, outcomes, DT_table = TRUE)
+hdmvm_table(mod_boot_summ, p, outcomes, p.adj.method = "BH", DT_table = TRUE)
 }
 \arguments{
 \item{mod_boot_summ}{A numeric matrix; the output from \code{\link[=bootstrap_model]{bootstrap_model()}}}
@@ -12,6 +12,8 @@ hdmvm_table(mod_boot_summ, p, outcomes, DT_table = TRUE)
 \item{p}{An integer representing the number of candidate mediators}
 
 \item{outcomes}{A character vector with the names of each outcome}
+
+\item{p.adj.method}{A character string for the p-value correction method; see \verb{\code{\link{stats::p.adjust}}}. Defaults to \code{"BH"}.}
 
 \item{DT_table}{A boolean indicating whether to return a DT table}
 }
