@@ -7,7 +7,7 @@
 #' @param outcomes A character vector with the names of each outcome
 #' @param DT_table A boolean indicating whether to return a DT table
 #'
-#' @returns Either an html widget of class `datatables` (if `DT_table = TRUE`) or the equivalent dataframe (if `DT_table = FALSE`). The latter is used when constructing a DAG with the function `to_DAG()`.
+#' @returns Either an html widget of class `datatables` (if `DT_table = TRUE`) or the equivalent dataframe (if `DT_table = FALSE`). The latter is used when constructing a DAG with the function `to_DAG()`. Includes a `Moderator` column identifying, for each row, which moderator (if any) the reported effect is indexed by; unmoderated PIDE/TIDE/DE rows show `"-"`.
 #'
 #' @examples
 #'\dontrun{
@@ -35,24 +35,41 @@ hdmvm_table <- function(mod_boot_summ, p, outcomes, DT_table = TRUE){
   bca_inter <- paste0("(",round(mod_boot_summ$bca_lowerCL,4),", ",round(mod_boot_summ$bca_upperCL,4),")")
   per_inter <- paste0("(",round(mod_boot_summ$per_lowerCL,4),", ",round(mod_boot_summ$per_upperCL,4),")")
 
-  mod_boot_outcome <- c(rep(outcomes, each = p), rep(outcomes, 2))
+  row_ids <- rownames(mod_boot_summ)
+
+  # Response/outcome index: every row (main or moderated) ends "..._resp<k>".
+  resp_idx <- as.integer(sub(".*_resp(\\d+)$", "\\1", row_ids))
+  mod_boot_outcome <- outcomes[resp_idx]
+
+  # Moderator tag: bootstrap_model() names moderated-effect rows
+  # "..._MOD_<moderator>_resp<k>"; unmoderated rows have no such tag.
+  stripped_resp <- sub("_resp\\d+$", "", row_ids)              # drop "_resp<k>"
+  has_mod       <- grepl("_MOD_", stripped_resp)
+  moderator     <- ifelse(has_mod, sub(".*_MOD_", "", stripped_resp), "-")
+
+  # Estimand: mediator name for PIDE rows, or "TIDE"/"DE"; drop the moderator tag
+  # (if any) and then the "_ide" suffix used only on PIDE rows.
+  base     <- sub("_MOD_.*$", "", stripped_resp)                # e.g. "M1_ide", "TIDE", "DE"
+  estimand <- sub("_ide$", "", base)                            # "M1_ide" -> "M1"; "TIDE"/"DE" unaffected
 
   mod_boot_table_df <- data.frame("Outcome" = mod_boot_outcome,
-                                  "Estimand" = gsub("(_resp[1-9])", "", gsub("(_ide_resp[1-9])", "", rownames(mod_boot_summ))),
+                                  "Estimand" = estimand,
+                                  "Moderator" = moderator,
                                   "Orig. Est." = round(mod_boot_summ$OrigEst,4),
                                   "Mean(boot)" = round(mod_boot_summ$Mean_boot,4),
                                   "sd(boot)" = round(mod_boot_summ$boot_SE,4),
                                   "pval" = signif(mod_boot_summ$boot_pval,4),
                                   "BC_a CI" = bca_inter,
-                                  "PBCI" = per_inter)
+                                  "PBCI" = per_inter,
+                                  check.names = FALSE)
   # mod_boot_table_df_print <- mod_boot_table_df[which(mod_boot_table_df$Orig..Est.!=0),]
   mod_boot_table_df_print <- mod_boot_table_df
 
   if(DT_table){
     DT::datatable(mod_boot_table_df_print, rownames = F,
-                colnames = c("Outcome", "Estimand", "Orig. Est.",
-                             "Mean(boot)", "sd(boot)", "p-value",
-                             "BCa CI", "PBCI"))
+                  colnames = c("Outcome", "Estimand", "Moderator", "Orig. Est.",
+                               "Mean(boot)", "sd(boot)", "p-value",
+                               "BCa CI", "PBCI"))
   } else{
     return(mod_boot_table_df_print)
   }

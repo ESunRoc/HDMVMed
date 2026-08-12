@@ -9,6 +9,7 @@ bootstrap_model(
   confounders,
   trt,
   outcomes,
+  moderators = NULL,
   quiet_msglasso = TRUE,
   lam1.v = seq(0.001, 0.05, length = 10),
   lamG.v = seq(0.001, 0.05, length = 10),
@@ -18,6 +19,7 @@ bootstrap_model(
   seed = 823543,
   theta_parallel = TRUE,
   penalize_conf = FALSE,
+  penalize_moderators = FALSE,
   outcome_grps = FALSE,
   NumOutGrps = NULL,
   OutGrpStarts = NULL,
@@ -37,6 +39,9 @@ bootstrap_model(
 
 \item{outcomes}{An \eqn{n\times q} numeric matrix of outcomes.}
 
+\item{moderators}{An optional \eqn{n\times r} numeric matrix of candidate moderators of
+the exposure effect; defaults to \code{NULL} (no moderated-mediation analysis). See details.}
+
 \item{quiet_msglasso}{A boolean indicator determining whether or not the CV progress of the MSGLasso estimation should be suppressed; defaults to \code{TRUE}.}
 
 \item{lam1.v}{A numeric vector of component-wise regularization parameters as in the MSGLasso of Li et al. (2015). By default, this is taken to be \code{seq(from = 1e-03, to = 0.05, length = 10)}.}
@@ -53,7 +58,14 @@ bootstrap_model(
 
 \item{theta_parallel}{A Boolean indicator for whether to compute the debiasing matrices in parallel. By default, this is \code{TRUE}.}
 
-\item{penalize_conf}{A Boolean indicator for whether the confounder block should be unpenalized. By default, this is \code{FALSE}.}
+\item{penalize_conf}{A Boolean indicator for whether the confounder block (which
+includes any moderator main effects; see \code{moderators}) should be unpenalized. By
+default, this is \code{FALSE}.}
+
+\item{penalize_moderators}{A Boolean indicator for whether the treatment x moderator
+interaction block should be unpenalized. By default, this is \code{FALSE}, so that
+moderated effects are always estimated and reported rather than possibly shrunk
+to zero by the group-Lasso penalty. Ignored if \code{moderators} is \code{NULL}.}
 
 \item{outcome_grps}{A Boolean indicator for whether or not there are any groups on the outcome variables. By default, there are no outcome groups so this argument is \code{FALSE}.}
 
@@ -72,17 +84,24 @@ bootstrap_model(
 \item{MediGrpEnds}{A vector of ending coordinates for the outcome groups. Equivalent to \code{G.Ends} from the \code{MSGLasso} package.}
 }
 \value{
-A \eqn{(p*q+2*q)\times 8} matrix \code{mod_boot_summ} with columns:
+A \eqn{(1+r)(p q+2q)\times 8} matrix \code{mod_boot_summ} (\code{r} = \code{ncol(moderators)},
+or simply a \eqn{(p q+2q)\times 8} matrix if \code{moderators} is \code{NULL}, as before) with
+columns:
 \itemize{
-\item \code{OrigEst}: the original PIDE/TIDE/DE estimate;
-\item \code{Mean_boot}: the mean of the bootstrap PIDE/TIDE/DE estimates;
-\item \code{boot_SE}: the standard deviation of the bootstrap PIDE/TIDE/DE estimates;
-\item \code{boot_pval}: the unadjusted p-value for the bootstrap PIDE/TIDE/DE estimates;
+\item \code{OrigEst}: the original PIDE/TIDE/DE (or moderated-PIDE/TIDE/DE) estimate;
+\item \code{Mean_boot}: the mean of the bootstrap estimates;
+\item \code{boot_SE}: the standard deviation of the bootstrap estimates;
+\item \code{boot_pval}: the unadjusted bootstrap p-value;
 \item \code{bca_lowerCL}: the lower limit of the \eqn{100(1-\texttt{alpha})\%} BCa CI;
 \item \code{bca_upperCL}: the upper limit of the \eqn{100(1-\texttt{alpha})\%} BCa CI;
 \item \code{per_lowerCL}: the lower limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI;
 \item \code{per_upperCL}: the upper limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI.
 }
+
+Row names identify the estimand as before (\code{"{mediator}_ide_resp{s}"},
+\code{"TIDE_resp{s}"}, \code{"DE_resp{s}"}), with moderated-effect rows additionally tagged
+\code{"..._MOD_{moderator}_resp{s}"}; \code{\link[=hdmvm_table]{hdmvm_table()}} parses this into an extra
+\code{Moderator} column.
 }
 \description{
 \code{bootstrap_model} is the main function for fitting and performing inference for the high-dimensional multivariate outcomes mediation model of Sun, Xiao, and Wu (2025).
@@ -92,6 +111,34 @@ The \code{MediGrpStarts} and \code{MediGrpEnds} can be structured as follows (\c
 Say you have \eqn{g} mediator groups, each with \eqn{p_1,\ldots,p_g} mediators. Then
 \verb{MediGrpStarts=c(0, p_1, ..., p_\{g-1\})} and \verb{MediGrpEnds=c(p_\{1\}-1, p_\{2\}-1, ..., p_g)}. In this way, \eqn{p_g\le p}.
 Critically, these index starting from 0 to be consistent with internal calls to \code{MSGLasso}.
+
+Each moderator \code{Z} is assumed to enter every regression as a treatment interaction, i.e.
+\code{mediators ~ trt + confounders + moderators + trt:moderators} for eq. (2.1) and
+\code{outcomes ~ mediators + trt + confounders + moderators + trt:moderators} for eq. (2.2).
+The main effect of each moderator is added to the confounder block automatically, so
+\code{moderators} should \emph{not} also be duplicated inside \code{confounders}. When supplied,
+\code{bootstrap_model} additionally reports, for every moderator and (mediator,outcome)
+combination: the index of moderated mediation (the rate of change of the
+PIDE/TIDE per unit of the moderator) and the moderated direct effect (the rate of
+change of the DE per unit of the moderator), together with the same bootstrap
+p-values and BCa/percentile confidence intervals computed for the unmoderated
+PIDE/TIDE/DE.
+
+\strong{Moderated mediation.} For a moderator \eqn{Z_r}, eq. (2.1)-(2.2) of Sun et al. become
+\eqn{M=A\alpha+U\xi+(A\odot Z_r)\delta^M_r+\epsilon_M} and
+\eqn{Y=M\phi+A\tau+U\eta+(A\odot Z_r)\delta^Y_r+\epsilon_Y}, so that at a fixed level
+\eqn{z} of the moderator the PIDE/TIDE/DE from Theorem 2.1 become
+\eqn{(\alpha+z\delta^M_r)\odot\phi_s}, \eqn{\sum_j(\alpha_{j}+z\delta^M_{r,j})\phi_{js}},
+and \eqn{\tau_s+z\delta^Y_{r,s}} respectively -- i.e. linear in \eqn{z} with slopes
+\eqn{\delta^M_r\odot\phi_s} (the index of moderated mediation, by mediator),
+\eqn{\sum_j\delta^M_{r,j}\phi_{js}} (the index of moderated mediation, summed), and
+\eqn{\delta^Y_{r,s}} (the moderated direct effect). These slopes (the rate of
+change of the PIDE/TIDE/DE per unit of \eqn{Z_r}) that \code{bootstrap_model} reports for
+each moderator when \code{moderators} is supplied, using the debiased \eqn{\hat\phi^d} for
+the mediator-side product exactly as for the unmoderated PIDE/TIDE (Theorem 2.3), and
+the raw (non-debiased) \eqn{\hat\delta^Y_r} for the moderated DE, exactly as for the
+unmoderated DE (as, like the treatment and confounder blocks, the interaction block
+is unpenalized by default; see \code{penalize_moderators}).
 }
 \examples{
 \dontrun{
@@ -108,6 +155,12 @@ outcomes <- hdmvmed_test_data[,2:6]
 model_fit <- bootstrap_model(mediators = mediators, confounders = confounders,
                              trt = trt, outcomes = outcomes, nB = 10)
 model_fit
+
+## Fit the model with a moderator of the exposure effect (e.g. the first confounder)
+moderators <- confounders[, 1, drop = FALSE]
+model_fit_mod <- bootstrap_model(mediators = mediators, confounders = confounders[,-1,drop=FALSE],
+                             trt = trt, outcomes = outcomes, moderators = moderators, nB = 10)
+model_fit_mod
 }
 
 }

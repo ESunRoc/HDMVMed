@@ -16,7 +16,7 @@ hdmvm_table(mod_boot_summ, p, outcomes, DT_table = TRUE)
 \item{DT_table}{A boolean indicating whether to return a DT table}
 }
 \value{
-Either an html widget of class \code{datatables} (if \code{DT_table = TRUE}) or the equivalent dataframe (if \code{DT_table = FALSE}). The latter is used when constructing a DAG with the function \code{to_DAG()}.
+Either an html widget of class \code{datatables} (if \code{DT_table = TRUE}) or the equivalent dataframe (if \code{DT_table = FALSE}). The latter is used when constructing a DAG with the function \code{to_DAG()}. Includes a \code{Moderator} column identifying, for each row, which moderator (if any) the reported effect is indexed by; unmoderated PIDE/TIDE/DE rows show \code{"-"}.
 }
 \description{
 \code{hdmvm_table()} converts the matrix output of the main \code{\link[=bootstrap_model]{bootstrap_model()}} function into a searchable/filterable html table using the \code{DT} package.

@@ -66,8 +66,15 @@ theta_calc <- function(X){
   Theta <- matrix(0, p, p)
   tau_sq <- numeric(p)
 
-  for(j in 1:p){
+  for (j in 1:p) {
     result <- theta_column(X, j)
+    # FIX (transpose bug): the j-th nodewise regression populates ROW j of Theta
+    # (Theta = T^{-2} C, with C's j-th row built from the j-th nodewise regression;
+    # see eq. (2.8)-(2.14) of Sun et al. and eq. (13) of the Supplementary Materials).
+    # The previous version wrote this into column j instead, silently returning
+    # t(Theta) rather than Theta whenever the nodewise LASSO fits were not exactly
+    # symmetric (i.e. essentially always, since Theta is only symmetric in the
+    # population and the estimator has no such constraint built in).
     Theta[j, ] <- result$theta_col
     tau_sq[j] <- result$tau_sq
   }
@@ -131,8 +138,8 @@ theta_column <- function(X, j){
 
   # Fill off-diagonal elements
   k_idx <- 1
-  for(k in 1:p){
-    if(k != j){
+  for (k in 1:p) {
+    if (k != j) {
       theta_col[k] <- -gamma_j[k_idx] / tau_sq_j
       k_idx <- k_idx + 1
     }
@@ -224,4 +231,35 @@ theta_calc_parallel <- function(X, cores = parallel::detectCores()-1, folds = 5)
   Theta <- That2_inv %*% Chat_mat
 
   return(unname(Theta))
+}
+
+#' Extract moderator interactions
+#'
+#' Extract treatment x moderator interaction coefficients from a `broom::tidy()` summary of a multivariate `lm()` fit (i.e. a `mediators ~ trt + confounders + AxZ` model), one column per moderator and one row per mediator.
+#'
+#' @param `tidy_df` A data frame as returned by `broom::tidy()` on the mlm fit; must have `term` and `response` columns.
+#' @param `varname` String of the name of the interaction-matrix argument as it appears in the model formula (e.g. `"AxZ"` or `"AxZ_boot"`); this reproduces the term names R assigns to matrix predictors when combined with each entry of `int_colnames`
+#' @param `int_colnames` Character vector of the column names of the interaction matrix (one per moderator).
+#' @param `mediator_names` Character vector of mediator names; used to both size the output and to align rows by `response` rather than assuming row order, in case `tidy()`'s row order ever changes.
+#'
+#' @returns A `length(mediator_names)`-by-`length(int_colnames)` matrix.
+#'
+#' @export
+extract_interaction_estimates <- function(tidy_df, varname, int_colnames, mediator_names){
+  out <- matrix(nrow = length(mediator_names), ncol = length(int_colnames))
+  rownames(out) <- mediator_names
+  colnames(out) <- int_colnames
+  for(rz in seq_along(int_colnames)){
+    term_name <- paste0(varname, int_colnames[rz])
+
+    # R's formula/model.matrix machinery does not append the column name when a
+    # matrix predictor has exactly one column (no ambiguity to resolve), so with a
+    # single moderator the term is just `varname` itself (e.g. "AxZ", not
+    # "AxZtrtxZ1"); fall back to that when the two-part name isn't present.
+
+    if(!(term_name %in% tidy_df$term) && length(int_colnames) == 1L) term_name <- varname
+    rows <- tidy_df[tidy_df$term == term_name, ]
+    out[, rz] <- rows$estimate[match(mediator_names, rows$response)]
+  }
+  return(out)
 }
