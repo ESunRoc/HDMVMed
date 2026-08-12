@@ -22,6 +22,17 @@ vec <- function(Mat) return(t(t(as.vector(Mat))))
 #'
 #' @returns The sparse sample covariance matrix estimated via the nodewise regression of van de Geer et al. (2014).
 #'
+#' @details
+#' `Theta` is estimated directly for the design matrix `X` as supplied, i.e. `Theta`
+#' approximates \eqn{(\boldsymbol{X}^\top\boldsymbol{X})^{-1}} for `X` on its original scale.
+#' This is deliberate: [bootstrap_model()] later forms the debiasing correction as
+#' `Theta %*% t(X) %*% (Y - X %*% Beta)` using this same (raw, unstandardized) `X`, so
+#' `Theta` must be computed on that identical scale for the correction to be valid.
+#' Internally, each nodewise LASSO regression is fit with `standardize = TRUE` purely
+#' for numerical conditioning (candidate mediators, confounders, and treatment can have
+#' very different scales); `glmnet` returns coefficients back-transformed to the
+#' original scale of `X`, so no manual re-scaling of `Theta` is required afterwards.
+#'
 #' @examples
 #' \dontrun{
 #'## Load the toy data
@@ -52,22 +63,19 @@ theta_calc <- function(X){
   n <- nrow(X)
   p <- ncol(X)
 
-  X_std <- scale(X)
-  X_std[is.na(X_std)] <- 0
-
   Theta <- matrix(0, p, p)
   tau_sq <- numeric(p)
 
-  for (j in 1:p) {
-    result <- theta_column(X_std, j)
-    Theta[, j] <- result$theta_col
+  for(j in 1:p){
+    result <- theta_column(X, j)
+    Theta[j, ] <- result$theta_col
     tau_sq[j] <- result$tau_sq
   }
 
   return(Theta)
 }
 
-# Compute column j of Theta \approx solve(t(X) %*% X)
+# Compute row j of Theta \approx solve(t(X) %*% X)
 #'
 #' Column-wise sample covariance
 #'
@@ -77,8 +85,9 @@ theta_calc <- function(X){
 #' @param j An integer between 1 and `ncol(X)` indicating the column on which to regress \eqn{X_{-j}}.
 #'
 #' @returns A list containing:
-#' * `theta_col`:
-#' * `tau_sq`:
+#' * `theta_col`: the j-th nodewise-regression vector, i.e. row j of \eqn{\hat\Theta = \hat T^{-2}\hat C}
+#'   (diagonal entry \eqn{1/\hat\tau_j^2}, off-diagonal entries \eqn{-\hat\gamma_{j,k}/\hat\tau_j^2}).
+#' * `tau_sq`: the nodewise-regression scale estimate \eqn{\hat\tau_j^2 = n^{-1}\Vert X_j-X_{-j}\hat\gamma_j\Vert_2^2+\lambda_j\Vert\hat\gamma_j\Vert_1}.
 #'
 #' @references{
 #' van de Geer, S., Bühlmann, P., Ritov, Y., and Dezeure, R. (2014). On Asymptotically Optimal Confidence Regions
@@ -107,11 +116,11 @@ theta_column <- function(X, j){
   X_minus_j <- X[, -j, drop = FALSE]
 
   cv_fit <- glmnet::cv.glmnet(X_minus_j, y_j, intercept = FALSE,
-                      standardize = FALSE, nfolds = 5)
+                              standardize = TRUE, nfolds = 5)
   lambda_opt <- cv_fit$lambda.min
 
   lasso_fit <- glmnet::glmnet(X_minus_j, y_j, lambda = lambda_opt,
-                      intercept = FALSE, standardize = FALSE)
+                              intercept = FALSE, standardize = TRUE)
   gamma_j <- as.numeric(lasso_fit$beta)
 
   residuals <- y_j - X_minus_j %*% gamma_j
@@ -122,8 +131,8 @@ theta_column <- function(X, j){
 
   # Fill off-diagonal elements
   k_idx <- 1
-  for (k in 1:p) {
-    if (k != j) {
+  for(k in 1:p){
+    if(k != j){
       theta_col[k] <- -gamma_j[k_idx] / tau_sq_j
       k_idx <- k_idx + 1
     }
@@ -142,6 +151,14 @@ theta_column <- function(X, j){
 #' @param folds An integer between 1 and `nrow(X)` indicating the number of CV folds to use in estimating the nodewise regressions; defaults to 5-fold CV.
 #'
 #' @returns The sparse sample covariance matrix estimated via the nodewise regression of van de Geer et al. (2014).
+#'
+#' @details
+#' As in [theta_calc()], `Theta` is estimated directly for `X` as supplied (raw scale);
+#' `standardize = TRUE` is used only to condition each nodewise LASSO fit, and
+#' `glmnet` returns coefficients on the original scale of `X`. This mirrors
+#' [theta_calc()] exactly (same tuning-parameter rule, `lambda.min`, and the same
+#' \eqn{\hat\tau_j^2} formula) so that the serial and parallel implementations compute
+#' the same estimator and differ only in their execution back-end.
 #'
 #' @examples
 #' \dontrun{
@@ -171,7 +188,6 @@ theta_column <- function(X, j){
 #' @export
 theta_calc_parallel <- function(X, cores = parallel::detectCores()-1, folds = 5){
   j <- NULL
-  X_std <- scale(X); X_std[is.na(X_std)] <- 0
 
   n <- nrow(X)
   res_mat <- matrix(nrow = ncol(X), ncol = ncol(X)+2)
@@ -180,29 +196,30 @@ theta_calc_parallel <- function(X, cores = parallel::detectCores()-1, folds = 5)
   doParallel::registerDoParallel(clust)
 
   res_mat <- foreach::foreach(j = 1:ncol(X), .combine = "rbind", .packages = "glmnet") %dopar% {
-    lasso_j <- glmnet::cv.glmnet(x = X[,-j], y = X[,j], nfolds = folds, intercept = F, standardize = F)
+    lasso_j <- glmnet::cv.glmnet(x = X[,-j], y = X[,j], nfolds = folds, intercept = F, standardize = TRUE)
 
     Chat_j <- numeric(ncol(X))
-    Chat_j[-j] <- lasso_j$glmnet.fit$beta[,lasso_j$index[2,]]
+    Chat_j[-j] <- lasso_j$glmnet.fit$beta[,lasso_j$index[1,]]
     Chat_j[j] <- 1
 
-    lambda_1se <- lasso_j$lambda.1se
-    gamma_j <- lasso_j$glmnet.fit$beta[,lasso_j$index[2,]]
+    lambda_min <- lasso_j$lambda.min
+    gamma_j <- lasso_j$glmnet.fit$beta[,lasso_j$index[1,]]
 
-    tau2_j <- norm(X[,j]-(X[,-j] %*% as.matrix(gamma_j)), "2")/n + lambda_1se * norm(as.matrix(gamma_j), "1")
+    resid_j <- X[,j] - (X[,-j] %*% as.matrix(gamma_j))
+    tau2_j <- mean(resid_j^2) + lambda_min * sum(abs(gamma_j))
 
-    c(lambda_1se, tau2_j, Chat_j)
+    c(lambda_min, tau2_j, Chat_j)
   }
 
   stopCluster(clust)
-  colnames(res_mat) <- c("lambda.1se", "tau2", paste0("gamma", 1:(ncol(res_mat)-2)))
+  colnames(res_mat) <- c("lambda.min", "tau2", paste0("gamma", 1:(ncol(res_mat)-2)))
   rownames(res_mat) <- colnames(X)
 
   tau2_mat <- res_mat[,"tau2"]
-  # lambda_mat <- res_mat[,"lambda.1se"]
+  # lambda_mat <- res_mat[,"lambda.min"]
 
   That2_inv <- diag(1/tau2_mat)
-  Chat_mat <- res_mat[,-which(colnames(res_mat)%in%c("lambda.1se", "tau2"))]
+  Chat_mat <- res_mat[,-which(colnames(res_mat)%in%c("lambda.min", "tau2"))]
 
   Theta <- That2_inv %*% Chat_mat
 

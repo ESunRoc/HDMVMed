@@ -19,6 +19,14 @@ The sparse sample covariance matrix estimated via the nodewise regression of van
 \description{
 \code{theta_calc_parallel()} computes the sparse sample covariance matrix, \eqn{\Theta\approx(\boldsymbol{X}^\top\boldsymbol{X})^{-1}}, via nodewise regression. The parallel back-end is implemented via \code{doParallel} and \code{foreach}.
 }
+\details{
+As in \code{\link[=theta_calc]{theta_calc()}}, \code{Theta} is estimated directly for \code{X} as supplied (raw scale);
+\code{standardize = TRUE} is used only to condition each nodewise LASSO fit, and
+\code{glmnet} returns coefficients on the original scale of \code{X}. This mirrors
+\code{\link[=theta_calc]{theta_calc()}} exactly (same tuning-parameter rule, \code{lambda.min}, and the same
+\eqn{\hat\tau_j^2} formula) so that the serial and parallel implementations compute
+the same estimator and differ only in their execution back-end.
+}
 \examples{
 \dontrun{
 ## Load the toy data

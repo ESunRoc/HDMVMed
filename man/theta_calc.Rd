@@ -15,6 +15,17 @@ The sparse sample covariance matrix estimated via the nodewise regression of van
 \description{
 \code{theta_calc()} computes the sparse sample covariance matrix, \eqn{\Theta\approx(\boldsymbol{X}^\top\boldsymbol{X})^{-1}}, via nodewise regression.
 }
+\details{
+\code{Theta} is estimated directly for the design matrix \code{X} as supplied, i.e. \code{Theta}
+approximates \eqn{(\boldsymbol{X}^\top\boldsymbol{X})^{-1}} for \code{X} on its original scale.
+This is deliberate: \code{\link[=bootstrap_model]{bootstrap_model()}} later forms the debiasing correction as
+\code{Theta \%*\% t(X) \%*\% (Y - X \%*\% Beta)} using this same (raw, unstandardized) \code{X}, so
+\code{Theta} must be computed on that identical scale for the correction to be valid.
+Internally, each nodewise LASSO regression is fit with \code{standardize = TRUE} purely
+for numerical conditioning (candidate mediators, confounders, and treatment can have
+very different scales); \code{glmnet} returns coefficients back-transformed to the
+original scale of \code{X}, so no manual re-scaling of \code{Theta} is required afterwards.
+}
 \examples{
 \dontrun{
 ## Load the toy data

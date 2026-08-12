@@ -14,8 +14,9 @@ theta_column(X, j)
 \value{
 A list containing:
 \itemize{
-\item \code{theta_col}:
-\item \code{tau_sq}:
+\item \code{theta_col}: the j-th nodewise-regression vector, i.e. row j of \eqn{\hat\Theta = \hat T^{-2}\hat C}
+(diagonal entry \eqn{1/\hat\tau_j^2}, off-diagonal entries \eqn{-\hat\gamma_{j,k}/\hat\tau_j^2}).
+\item \code{tau_sq}: the nodewise-regression scale estimate \eqn{\hat\tau_j^2 = n^{-1}\Vert X_j-X_{-j}\hat\gamma_j\Vert_2^2+\lambda_j\Vert\hat\gamma_j\Vert_1}.
 }
 }
 \description{
