@@ -18,6 +18,10 @@ bootstrap_model(
   msg_folds = 5,
   seed = 823543,
   theta_parallel = TRUE,
+  theta_cores = max(1, parallel::detectCores() - 1),
+  theta_folds = 5,
+  boot_parallel = TRUE,
+  boot_cores = max(1, parallel::detectCores() - 1),
   penalize_conf = FALSE,
   penalize_moderators = FALSE,
   outcome_grps = FALSE,
@@ -58,9 +62,16 @@ the exposure effect; defaults to \code{NULL} (no moderated-mediation analysis). 
 
 \item{theta_parallel}{A Boolean indicator for whether to compute the debiasing matrices in parallel. By default, this is \code{TRUE}.}
 
-\item{penalize_conf}{A Boolean indicator for whether the confounder block (which
-includes any moderator main effects; see \code{moderators}) should be unpenalized. By
-default, this is \code{FALSE}.}
+\item{theta_cores}{An integer denoting the number of logical cores to use when
+\code{theta_parallel = TRUE}; passed through to \code{\link[=theta_calc_parallel]{theta_calc_parallel()}}. Defaults to \code{min(1,detectCores()-1)}}
+
+\item{theta_folds}{An integer denoting the number of CV folds used in the nodewise regressions underlying the debiasing matrix; passed through to \code{\link[=theta_calc]{theta_calc()}}/\code{\link[=theta_calc_parallel]{theta_calc_parallel()}}. Defaults to 5.}
+
+\item{boot_parallel}{A Boolean indicator for whether the \code{nB} bootstrap replicates, the dominant cost, should be computed in parallel via \code{doParallel}/\code{foreach}. By default, this is \code{TRUE}.}
+
+\item{boot_cores}{An integer denoting the number of logical cores to use when \code{boot_parallel = TRUE}. Defaults to \code{min(1,detectCores()-1)}}
+
+\item{penalize_conf}{A Boolean indicator for whether the confounder block should be unpenalized. By default, this is \code{FALSE}.}
 
 \item{penalize_moderators}{A Boolean indicator for whether the treatment x moderator
 interaction block should be unpenalized. By default, this is \code{FALSE}, so that

@@ -16,9 +16,12 @@
 #' @param msg_folds A numeric determining the number of CV folds to be used in tuning the MSGLasso regularization parameters. By default, this is taken to be 3.
 #' @param seed An integer seed for reproducible bootstrap inference.
 #' @param theta_parallel A Boolean indicator for whether to compute the debiasing matrices in parallel. By default, this is `TRUE`.
-#' @param penalize_conf A Boolean indicator for whether the confounder block (which
-#'   includes any moderator main effects; see `moderators`) should be unpenalized. By
-#'   default, this is `FALSE`.
+#' @param theta_cores An integer denoting the number of logical cores to use when
+#'   `theta_parallel = TRUE`; passed through to [theta_calc_parallel()]. Defaults to `min(1,detectCores()-1)`
+#' @param theta_folds An integer denoting the number of CV folds used in the nodewise regressions underlying the debiasing matrix; passed through to [theta_calc()]/[theta_calc_parallel()]. Defaults to 5.
+#' @param boot_parallel A Boolean indicator for whether the `nB` bootstrap replicates, the dominant cost, should be computed in parallel via `doParallel`/`foreach`. By default, this is `TRUE`.
+#' @param boot_cores An integer denoting the number of logical cores to use when `boot_parallel = TRUE`. Defaults to `min(1,detectCores()-1)`
+#' @param penalize_conf A Boolean indicator for whether the confounder block should be unpenalized. By default, this is `FALSE`.
 #' @param penalize_moderators A Boolean indicator for whether the treatment x moderator
 #'   interaction block should be unpenalized. By default, this is `FALSE`, so that
 #'   moderated effects are always estimated and reported rather than possibly shrunk
@@ -123,6 +126,8 @@
 bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = NULL, quiet_msglasso = TRUE,
                             lam1.v = seq(1e-3, 0.05, length=10), lamG.v = seq(1e-3, 0.05, length=10),
                             alpha = 0.05, nB = 5e3, msg_folds = 5, seed = 823543, theta_parallel = TRUE,
+                            theta_cores = max(1, parallel::detectCores()-1), theta_folds = 5,
+                            boot_parallel = TRUE, boot_cores = max(1, parallel::detectCores()-1),
                             penalize_conf = FALSE, penalize_moderators = FALSE, outcome_grps = FALSE, NumOutGrps = NULL, OutGrpStarts = NULL,
                             OutGrpEnds = NULL, medi_grps = FALSE, NumMediGrps = NULL, MediGrpStarts = NULL, MediGrpEnds = NULL){
 
@@ -136,13 +141,28 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   #### Moderators: build treatment x moderator interaction terms ####
   # Moderators enter each regression as a treatment interaction. Each moderator's main effect is folded into the
   # confounder block so the interaction coefficient isn't confounded with an omitted main effect of Z; the interaction
-  # columns themselves (AxZ) are appended as their own unpenalized-by-default block, placed after the treatment column
+  # columns (AxZ) are appended as their own unpenalized-by-default block, placed after the treatment column
   # exactly the way the treatment column itself is appended after the confounder block below.
   has_moderators <- !is.null(moderators)
   if(has_moderators){
     moderators <- as.matrix(moderators)
     if(is.null(colnames(moderators))) colnames(moderators) <- paste0("Z", 1:ncol(moderators))
     r <- ncol(moderators)
+
+    # input validation for moderators:
+    # a moderator that is constant (zero variance) has an unidentifiable treatment interaction
+    # This column(s) are reported and should be dropped from the input
+    const_mods <- colnames(moderators)[apply(moderators, 2, function(z) length(unique(z)) <= 1)]
+    if(length(const_mods) > 0){
+      stop("The following moderator(s) are constant (zero variance) in this sample: ",
+           paste(const_mods, collapse=", "),
+           ". A constant moderator has no estimable treatment interaction (trt*Z ",
+           "carries no information) and will silently corrupt downstream PIDE/TIDE/DE ",
+           "estimates or crash the underlying MSGLasso fit. Remove the constant ",
+           "moderator(s) from `moderators` before calling bootstrap_model(), or, if ",
+           "this reflects a genuine subgroup with zero observed cases, consider ",
+           "whether this moderator is estimable in this sample at all.")
+    }
 
     AxZ <- moderators * as.vector(trt) # elementwise A_i * Z_i,r for every row i, moderator r
     colnames(AxZ) <- paste0("trtx", colnames(moderators))
@@ -152,6 +172,37 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
     r <- 0
   }
 
+  # FIX (input validation): more generally, even without any single constant column,
+  # the FULL Stage-1 design (intercept + trt + confounders [incl. any moderator main
+  # effects] + AxZ interactions) can be exactly rank-deficient -- e.g. two moderators
+  # that are mutually-exclusive levels of one underlying categorical variable (a
+  # "dummy variable trap") become collinear once both are interacted with treatment,
+  # even though *neither* moderator is constant on its own. lm() does not error on
+  # this; it silently aliases one of the redundant coefficients to NA (confirmed
+  # directly against real data: two feeding-type moderators, ~-0.6 to -0.8
+  # correlated, produced an NA Stage-1 coefficient for one of their treatment
+  # interactions, which -- like the constant-column case above -- silently
+  # contaminates every downstream PIDE/TIDE for that moderator with NA, ultimately
+  # surfacing as "missing value where TRUE/FALSE needed" once the bootstrap p-value
+  # step tries to compare that NA to zero). Checking the design matrix's rank
+  # up front catches this class of problem for a clear, specific error instead.
+  stage1_design <- if(has_moderators) cbind(1, trt, confounders, AxZ) else cbind(1, trt, confounders)
+  stage1_design_names <- if(has_moderators) c("(Intercept)", "trt", colnames(confounders), colnames(AxZ)) else c("(Intercept)", "trt", colnames(confounders))
+  qr_design <- qr(stage1_design)
+  if(qr_design$rank < ncol(stage1_design)){
+    dependent_cols <- stage1_design_names[qr_design$pivot[(qr_design$rank+1):ncol(stage1_design)]]
+    stop("The design matrix formed by trt, confounders, and (if supplied) moderators ",
+         "and their treatment interactions is rank-deficient: the following column(s) ",
+         "are an exact linear combination of the others and have no identifiable ",
+         "coefficient: ", paste(dependent_cols, collapse=", "), ". This commonly ",
+         "happens when two or more moderators (or confounders) are mutually exclusive ",
+         "levels of the same underlying categorical variable -- interacting *all* of ",
+         "them with treatment reintroduces the collinearity that dummy-coding was ",
+         "meant to avoid. Drop one of the implicated moderator/confounder columns (or ",
+         "re-code them, e.g. keep only k-1 of k mutually exclusive categories) before ",
+         "calling bootstrap_model().")
+  }
+
   k <- 1                 # number of exposures/treatments
   p <- ncol(mediators)   # number of mediators
   l <- ncol(confounders) # number of confounders (includes moderator main effects, if any)
@@ -159,6 +210,7 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   n <- length(trt)       # number of subjects
 
   X_design <- if(has_moderators) cbind(mediators, confounders, trt, AxZ) else cbind(mediators, confounders, trt)
+
 
   #### Treatment --> Mediators ####
   trtToMedi <- if(has_moderators) lm(mediators ~ trt + confounders + AxZ) else lm(mediators ~ trt + confounders)
@@ -171,11 +223,19 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
     delta_M <- extract_interaction_estimates(trtToMedi_summ, "AxZ", colnames(AxZ), colnames(mediators))
   }
 
+
   #### Mediators --> Outcomes ####
   P <- p + l + k + r; Q <- q
 
-  # Group bookkeeping:
-  # FindingPQGrps() (MSGLasso) assigns 0-indexed column p to group g whenever GarrStarts[g] <= p <= GarrEnds[g]
+  # Group bookkeeping. FindingPQGrps() (MSGLasso) assigns 0-indexed column p to group
+  # g whenever GarrStarts[g] <= p <= GarrEnds[g] (inclusive on both ends; confirmed
+  # directly against MSGLasso's C source, Find_PQ_Coord_Grps). The confounder/
+  # treatment bounds below were previously off by one column (the confounder group's
+  # end reached one column too far, silently swallowing the treatment column into the
+  # confounder group, while the nominal "treatment group" bounds pointed past the
+  # last valid column index and so never matched anything) -- corrected here as part
+  # of inserting the new moderator-interaction group, since getting these bounds
+  # right is required for that group to be assigned correctly.
   if(medi_grps){
     n_medi_grps <- NumMediGrps # FIX: was `medi_grps` (a boolean), not the group count
     base_starts <- MediGrpStarts; base_ends <- MediGrpEnds
@@ -214,7 +274,10 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   tmp_GRgrps <- FindingGRGrps(P = P, Q = Q, G, R, cmax, GarrStarts, GarrEnds, RarrStarts, RarrEnds)
   GRgrps <- tmp_GRgrps$GRgrps
 
-
+  # This scoping is required due to a bug in the `MSGLasso` package:
+  # In MSGLasso.R (lines 30-37), the transpose-or-not check for its `Pen.L`/`Pen.G` parameters is
+  # written as `if(!is.null(ncol(Pen_L)))`/`ncol(Pen_G)`. This naming discrepancy causes an error if
+  # `Pen_L`/`Pen_G` don't exist in the global environment of the user.
   Pen_L <<- matrix(rep(1, P*Q), P, Q, byrow=T)
 
   Pen_G <<- matrix(rep(1,G*R),G,R, byrow=TRUE)
@@ -251,13 +314,8 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   MSGLassolam1 <- mod_try.cv$lams.c[which.min(as.vector(mod_try.cv$rss.cv))][[1]]$lam1
   MSGLassolamG <- mod_try.cv$lams.c[which.min(as.vector(mod_try.cv$rss.cv))][[1]]$lam3
   MSGLassolamG.m <- matrix(rep(MSGLassolamG, G*R),G,R,byrow=TRUE)
-
-  if(penalize_conf == TRUE){ # if penalize_conf == FALSE,
-    MSGLassolamG.m[c(conf_grp_row, trt_grp_row),] <- 0
-  }
-  if(has_moderators && penalize_moderators){ # if penalize_moderators == FALSE (the default),
-    if(has_moderators && !penalize_moderators) MSGLassolamG.m[modint_grp_row,] <- 0
-  }
+  MSGLassolamG.m[c(conf_grp_row, trt_grp_row),] <- 0
+  if(has_moderators && !penalize_moderators) MSGLassolamG.m[modint_grp_row,] <- 0
 
   mod_Stage2 <- MSGLasso(X.m = X_design,
                          Y.m = outcomes,
@@ -271,7 +329,7 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   # rownames(mod_Stage2_all) <- c(colnames(mediators), colnames(confounders), "Exposure")
 
   if(theta_parallel){
-    theta_mod <- theta_calc_parallel(X = X_design)
+    theta_mod <- theta_calc_parallel(X = X_design, cores = theta_cores, folds = theta_folds)
   } else {
     theta_mod <- theta_calc(X = X_design)
   }
@@ -279,7 +337,7 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   mod_Stage2_all <- mod_Stage2_debiased
   rownames(mod_Stage2_all) <- c(colnames(mediators), colnames(confounders), "Exposure", if(has_moderators) colnames(AxZ))
 
-  #### Calculate DE and PIDEs
+  #### DE and PIDEs
   trt_row_idx <- p + l + 1
   mod_DE <- mod_Stage2$Beta[trt_row_idx, ]
 
@@ -333,13 +391,8 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   set.seed(seed)
   for(i in 1:nB) {B_draws[,i] <- sample(1:n, n, replace=T)}
 
-  mod_bootRes <- matrix(nrow = n_rows_total, ncol = nB)
-  rownames(mod_bootRes) <- all_rownames
-  colnames(mod_bootRes) <- paste0("BootDraw",1:nB)
-
-
-  start_time <- proc.time()
-  for(i in 1:nB){
+  # run one bootstrap replicate and return the length-n_rows_total result vector for that replicate
+  run_boot_iter <- function(i){
     boot_sample <- B_draws[,i]
     confounders_boot <- confounders[boot_sample,]
     trt_boot <- trt[boot_sample]
@@ -385,7 +438,8 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
 
     mod_tide_mat_boot_sums <- colSums(mod_pide_mat_boot)
 
-    mod_bootRes[1:n_main_rows,i] <- c(vec(mod_pide_mat_boot),mod_tide_mat_boot_sums,mod_boot_DE)
+    boot_result <- numeric(n_rows_total)
+    boot_result[1:n_main_rows] <- c(vec(mod_pide_mat_boot),mod_tide_mat_boot_sums,mod_boot_DE)
 
     ## Moderated PIDE/TIDE/DE calculation (mirrors the main fit, per moderator)
     if(has_moderators){
@@ -394,28 +448,68 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
         inttide_boot <- colSums(intpide_boot)
         intDE_boot <- unname(mod_stage2_boot_all[colnames(AxZ_boot)[rz], ])
         block_idx <- (rz*n_main_rows+1):((rz+1)*n_main_rows)
-        mod_bootRes[block_idx, i] <- c(vec(intpide_boot), inttide_boot, intDE_boot)
+        boot_result[block_idx] <- c(vec(intpide_boot), inttide_boot, intDE_boot)
       }
     }
 
-    if(i %% 100 == 0){
-      cat(paste0("Done with boot sample ", i, "; ", nB-i, " remaining. Time elapsed: ",
-                 round(-1*(start_time[3] - proc.time()[3])/60, 3), " minutes. Apx. ",
-                 round(((-1*(start_time[3] - proc.time()[3])/60)/i)*(nB-i), 3), " minutes remaining\n"))
-    }
+    return(boot_result)
   }
 
-  mod_bootRes <- ifelse((is.nan(mod_bootRes) | is.na(mod_bootRes)), rowMeans(mod_bootRes, na.rm=T), mod_bootRes)
+  boot_cores_use <- max(1, min(boot_cores, nB))
+  use_parallel <- boot_parallel && boot_cores_use > 1
+
+  start_time <- proc.time()
+
+  if(use_parallel){
+    chunk_id <- cut(seq_len(nB), boot_cores_use, labels = FALSE)
+    chunks <- split(seq_len(nB), chunk_id)
+
+    clust <- parallel::makeCluster(boot_cores_use)
+    doParallel::registerDoParallel(clust)
+    on.exit(parallel::stopCluster(clust), add = TRUE)
+
+    # Replicate the Pen_L/Pen_G global-environment workaround
+    parallel::clusterExport(clust, varlist = c("Pen_L", "Pen_G"))
+
+    cat(paste0("Running ", nB, " bootstrap replicates across ", boot_cores_use,
+               " parallel workers...\n"))
+
+    chunk_idx <- NULL # avoid an R CMD check NOTE for the foreach loop variable
+    mod_bootRes <- foreach::foreach(chunk_idx = chunks, .combine = "cbind",
+                                    .packages = c("MSGLasso", "broom", "hdmvmed")) %dopar% {
+                                      sapply(chunk_idx, run_boot_iter)
+                                    }
+
+    cat(paste0("Done. Time elapsed: ",
+               round((proc.time()-start_time)[3]/60, 3), " minutes.\n"))
+  } else {
+    mod_bootRes <- matrix(nrow = n_rows_total, ncol = nB)
+    for(i in 1:nB){
+      mod_bootRes[,i] <- run_boot_iter(i)
+
+      if(i %% 100 == 0){
+        cat(paste0("Done with boot sample ", i, "; ", nB-i, " remaining. Time elapsed: ",
+                   round(-1*(start_time[3] - proc.time()[3])/60, 3), " minutes. Apx. ",
+                   round(((-1*(start_time[3] - proc.time()[3])/60)/i)*(nB-i), 3), " minutes remaining\n"))
+      }
+    }
+  }
+  rownames(mod_bootRes) <- all_rownames
+  colnames(mod_bootRes) <- paste0("BootDraw",1:nB)
+
+  bad_entries <- is.nan(mod_bootRes) | is.na(mod_bootRes)
+  if(any(bad_entries)){
+    row_means_boot <- rowMeans(mod_bootRes, na.rm = TRUE)
+    mod_bootRes[bad_entries] <- row_means_boot[row(mod_bootRes)[bad_entries]]
+  }
 
   ## bootstrap p-values
-  mod_boot_pvals <- matrix(nrow=n_rows_total, ncol = 1)
-  for(i in 1:nrow(mod_bootRes)){
-    if(mod_origFit_mat[i,] >= 0){
-      mod_boot_pvals[i,] <- min(2*sum(mod_bootRes[i,]>=2*mod_origFit_mat[i,],na.rm=T)/nB,1)
-    } else{
-      mod_boot_pvals[i,] <- min(2*sum(mod_bootRes[i,]<2*mod_origFit_mat[i,],na.rm=T)/nB,1)
-    }
-  }
+  threshold <- as.vector(2*mod_origFit_mat)
+  is_nonneg <- as.vector(mod_origFit_mat) >= 0
+  ge_counts <- rowSums(mod_bootRes >= threshold, na.rm = TRUE)
+  lt_counts <- rowSums(mod_bootRes <  threshold, na.rm = TRUE)
+  boot_counts <- ifelse(is_nonneg, ge_counts, lt_counts) # length n_rows_total; ifelse() is fine at this size
+  mod_boot_pvals <- matrix(pmin(2*boot_counts/nB, 1), ncol = 1)
 
   ## BCa confidence intervals
   mod_boot_bcaCI <- t(apply(mod_bootRes, 1, coxed::bca, conf.level = 1-alpha))
@@ -425,11 +519,13 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   mod_boot_perCI <- 2*matrix(data = c(mod_origFit_mat, mod_origFit_mat), ncol = 2) - t(apply(mod_bootRes, 1, quantile, c(1-alpha/2,alpha/2)))
 
   ## Summary table
-  mod_boot_summ <- cbind(mod_origFit_mat, apply(mod_bootRes,1,mean), apply(mod_bootRes,1,sd),
+  mod_boot_rowsd <- sqrt(rowSums((mod_bootRes - rowMeans(mod_bootRes))^2) / (ncol(mod_bootRes) - 1))
+  mod_boot_summ <- cbind(mod_origFit_mat, rowMeans(mod_bootRes), mod_boot_rowsd,
                          mod_boot_pvals, mod_boot_bcaCI, mod_boot_perCI)
   colnames(mod_boot_summ) <- c("OrigEst", "Mean_boot", "boot_SE", "boot_pval",
                                "bca_lowerCL", "bca_upperCL",
                                "per_lowerCL", "per_upperCL")
   mod_boot_summ[is.nan(mod_boot_summ)] <- 0
+
   return(mod_boot_summ)
 }
