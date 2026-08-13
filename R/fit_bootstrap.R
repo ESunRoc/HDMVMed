@@ -172,33 +172,17 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
     r <- 0
   }
 
-  # FIX (input validation): more generally, even without any single constant column,
-  # the FULL Stage-1 design (intercept + trt + confounders [incl. any moderator main
-  # effects] + AxZ interactions) can be exactly rank-deficient -- e.g. two moderators
-  # that are mutually-exclusive levels of one underlying categorical variable (a
-  # "dummy variable trap") become collinear once both are interacted with treatment,
-  # even though *neither* moderator is constant on its own. lm() does not error on
-  # this; it silently aliases one of the redundant coefficients to NA (confirmed
-  # directly against real data: two feeding-type moderators, ~-0.6 to -0.8
-  # correlated, produced an NA Stage-1 coefficient for one of their treatment
-  # interactions, which -- like the constant-column case above -- silently
-  # contaminates every downstream PIDE/TIDE for that moderator with NA, ultimately
-  # surfacing as "missing value where TRUE/FALSE needed" once the bootstrap p-value
-  # step tries to compare that NA to zero). Checking the design matrix's rank
-  # up front catches this class of problem for a clear, specific error instead.
   stage1_design <- if(has_moderators) cbind(1, trt, confounders, AxZ) else cbind(1, trt, confounders)
   stage1_design_names <- if(has_moderators) c("(Intercept)", "trt", colnames(confounders), colnames(AxZ)) else c("(Intercept)", "trt", colnames(confounders))
   qr_design <- qr(stage1_design)
   if(qr_design$rank < ncol(stage1_design)){
     dependent_cols <- stage1_design_names[qr_design$pivot[(qr_design$rank+1):ncol(stage1_design)]]
-    stop("The design matrix formed by trt, confounders, and (if supplied) moderators ",
+    stop("The design matrix formed by trt, confounders, and (if used) moderators ",
          "and their treatment interactions is rank-deficient: the following column(s) ",
          "are an exact linear combination of the others and have no identifiable ",
-         "coefficient: ", paste(dependent_cols, collapse=", "), ". This commonly ",
-         "happens when two or more moderators (or confounders) are mutually exclusive ",
-         "levels of the same underlying categorical variable -- interacting *all* of ",
-         "them with treatment reintroduces the collinearity that dummy-coding was ",
-         "meant to avoid. Drop one of the implicated moderator/confounder columns (or ",
+         "coefficient: ", paste(dependent_cols, collapse=", "), ". This may ",
+         "happen when two or more moderators (or confounders) are mutually exclusive ",
+         "levels of the same underlying categorical variable. Drop one of the implicated moderator/confounder columns (or ",
          "re-code them, e.g. keep only k-1 of k mutually exclusive categories) before ",
          "calling bootstrap_model().")
   }
@@ -229,13 +213,7 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
 
   # Group bookkeeping. FindingPQGrps() (MSGLasso) assigns 0-indexed column p to group
   # g whenever GarrStarts[g] <= p <= GarrEnds[g] (inclusive on both ends; confirmed
-  # directly against MSGLasso's C source, Find_PQ_Coord_Grps). The confounder/
-  # treatment bounds below were previously off by one column (the confounder group's
-  # end reached one column too far, silently swallowing the treatment column into the
-  # confounder group, while the nominal "treatment group" bounds pointed past the
-  # last valid column index and so never matched anything) -- corrected here as part
-  # of inserting the new moderator-interaction group, since getting these bounds
-  # right is required for that group to be assigned correctly.
+  # directly against MSGLasso's C source, Find_PQ_Coord_Grps).
   if(medi_grps){
     n_medi_grps <- NumMediGrps # FIX: was `medi_grps` (a boolean), not the group count
     base_starts <- MediGrpStarts; base_ends <- MediGrpEnds

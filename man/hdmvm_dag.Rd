@@ -4,7 +4,7 @@
 \alias{hdmvm_dag}
 \title{Generate a tikz-cd DAG}
 \usage{
-hdmvm_dag(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1)
+hdmvm_dag(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, use_adj = TRUE)
 }
 \arguments{
 \item{mod_boot_summ}{A data frame; the output from \code{\link[=hdmvm_table]{hdmvm_table()}} with \code{DT_table = FALSE}.}
@@ -16,6 +16,8 @@ hdmvm_dag(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1)
 \item{trt_name}{A character vector denoting the name of the treatment/exposure. By default, "trt" is used as a placeholder.}
 
 \item{alpha}{A numeric between 0 and 1 denoting the nominal significance threshold for inclusion in the DAG. By default, 0.1 is used.}
+
+\item{use_adj}{A Boolean indicating whether to use the adjusted p-values; see \code{\link[=hdmvm_table]{hdmvm_table()}}.}
 }
 \value{
 A text string that, when passed through \code{cat()}, returns the \code{tikz-cd} code for the selected DAG.

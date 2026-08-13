@@ -7,6 +7,7 @@
 #' @param q An integer denoting the number of outcomes i.e., `ncol(outcomes)`.
 #' @param trt_name A character vector denoting the name of the treatment/exposure. By default, "trt" is used as a placeholder.
 #' @param alpha A numeric between 0 and 1 denoting the nominal significance threshold for inclusion in the DAG. By default, 0.1 is used.
+#' @param use_adj A Boolean indicating whether to use the adjusted p-values; see [hdmvm_table()].
 #'
 #' @return A text string that, when passed through `cat()`, returns the `tikz-cd` code for the selected DAG.
 #'
@@ -34,8 +35,13 @@
 #'}
 #'
 #' @export
-hdmvm_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1){
-  dag_matrix <- as.matrix(mod_boot_summ[which(mod_boot_summ$pval[1:(q*p)]<=alpha),c("Outcome","Estimand")])
+hdmvm_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, use_adj = TRUE){
+  if(use_adj){
+    dag_matrix <- as.matrix(mod_boot_summ[which(mod_boot_summ$pval_adj[1:(q*p)]<=alpha),c("Outcome","Estimand")])
+  } else {
+    dag_matrix <- as.matrix(mod_boot_summ[which(mod_boot_summ$pval[1:(q*p)]<=alpha),c("Outcome","Estimand")])
+  }
+
 
   # extract node names
   out_nodes <- sort(unique(dag_matrix[, 1]))
@@ -117,7 +123,7 @@ hdmvm_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1){
   }
 
   # mediators --> outcomes
-  for (i in 1:nrow(dag_matrix)) {
+  for(i in 1:nrow(dag_matrix)){
     out_index <- dag_matrix[i, 1]
     med_index <- dag_matrix[i, 2]
 
