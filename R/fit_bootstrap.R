@@ -17,10 +17,10 @@
 #' @param seed An integer seed for reproducible bootstrap inference.
 #' @param theta_parallel A Boolean indicator for whether to compute the debiasing matrices in parallel. By default, this is `TRUE`.
 #' @param theta_cores An integer denoting the number of logical cores to use when
-#'   `theta_parallel = TRUE`; passed through to [theta_calc_parallel()]. Defaults to `min(1,detectCores()-1)`
+#'   `theta_parallel = TRUE`; passed through to [theta_calc_parallel()]. Defaults to `max(1,detectCores()-1)`
 #' @param theta_folds An integer denoting the number of CV folds used in the nodewise regressions underlying the debiasing matrix; passed through to [theta_calc()]/[theta_calc_parallel()]. Defaults to 5.
 #' @param boot_parallel A Boolean indicator for whether the `nB` bootstrap replicates, the dominant cost, should be computed in parallel via `doParallel`/`foreach`. By default, this is `TRUE`.
-#' @param boot_cores An integer denoting the number of logical cores to use when `boot_parallel = TRUE`. Defaults to `min(1,detectCores()-1)`
+#' @param boot_cores An integer denoting the number of logical cores to use when `boot_parallel = TRUE`. Defaults to `max(1,detectCores()-1)`
 #' @param penalize_conf A Boolean indicator for whether the confounder block should be unpenalized. By default, this is `FALSE`.
 #' @param penalize_moderators A Boolean indicator for whether the treatment x moderator
 #'   interaction block should be unpenalized. By default, this is `FALSE`, so that
@@ -454,7 +454,7 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
 
     chunk_idx <- NULL # avoid an R CMD check NOTE for the foreach loop variable
     mod_bootRes <- foreach::foreach(chunk_idx = chunks, .combine = "cbind",
-                                    .packages = c("MSGLasso", "broom", "hdmvmed")) %dopar% {
+                                    .packages = c("MSGLasso", "broom", "HDMVMed")) %dopar% {
                                       sapply(chunk_idx, run_boot_iter)
                                     }
 
