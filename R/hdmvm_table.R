@@ -33,12 +33,12 @@
 hdmvm_table <- function(mod_boot, p, outcomes, p.adj.method = "BH", DT_table = TRUE){
   p.adj.method <- match.arg(p.adj.method)
 
-  mod_boot_summ <- as.data.frame(mod_boot_summ)
+  mod_boot <- as.data.frame(mod_boot)
 
-  bca_inter <- paste0("(",round(mod_boot_summ$bca_lowerCL,4),", ",round(mod_boot_summ$bca_upperCL,4),")")
-  per_inter <- paste0("(",round(mod_boot_summ$per_lowerCL,4),", ",round(mod_boot_summ$per_upperCL,4),")")
+  bca_inter <- paste0("(",round(mod_boot$bca_lowerCL,4),", ",round(mod_boot$bca_upperCL,4),")")
+  per_inter <- paste0("(",round(mod_boot$per_lowerCL,4),", ",round(mod_boot$per_upperCL,4),")")
 
-  row_ids <- rownames(mod_boot_summ)
+  row_ids <- rownames(mod_boot)
 
   # Response/outcome index: every row (main or moderated) ends "..._resp<k>".
   resp_idx <- as.integer(sub(".*_resp(\\d+)$", "\\1", row_ids))
@@ -56,14 +56,14 @@ hdmvm_table <- function(mod_boot, p, outcomes, p.adj.method = "BH", DT_table = T
   estimand <- sub("_ide$", "", base)                            # "M1_ide" -> "M1"; "TIDE"/"DE" unaffected
 
 
-  pvals_adjusted <- p.adjust(mod_boot_summ$boot_pval, method = p.adj.method)
+  pvals_adjusted <- p.adjust(mod_boot$boot_pval, method = p.adj.method)
   mod_boot_table_df <- data.frame("Outcome" = mod_boot_outcome,
                                   "Estimand" = estimand,
                                   "Moderator" = moderator,
-                                  "Orig. Est." = round(mod_boot_summ$OrigEst,4),
-                                  "Mean(boot)" = round(mod_boot_summ$Mean_boot,4),
-                                  "sd(boot)" = round(mod_boot_summ$boot_SE,4),
-                                  "pval" = signif(mod_boot_summ$boot_pval,4),
+                                  "Orig. Est." = round(mod_boot$OrigEst,4),
+                                  "Mean(boot)" = round(mod_boot$Mean_boot,4),
+                                  "sd(boot)" = round(mod_boot$boot_SE,4),
+                                  "pval" = signif(mod_boot$boot_pval,4),
                                   "pval_adj" = signif(pvals_adjusted, 4),
                                   "BC_a CI" = bca_inter,
                                   "PBCI" = per_inter,
@@ -73,7 +73,7 @@ hdmvm_table <- function(mod_boot, p, outcomes, p.adj.method = "BH", DT_table = T
 
   if(DT_table){
     DT::datatable(mod_boot_table_df_print, rownames = F,
-                  colnames = c("Outcome", "Estimand", "Moderator", "Orig. Est.",
+                  colnames = c("Outcome", "Mediator/Effect", "Moderator", "Orig. Est.",
                                "Mean(boot)", "sd(boot)", "p-value",
                                "BCa CI", "PBCI"))
   } else{

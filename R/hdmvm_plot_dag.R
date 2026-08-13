@@ -21,7 +21,8 @@
 #' @param est_sign_colors A length-2 character vector of colors used for positive and negative estimates (in that order) when `color_arrows = TRUE`. Defaults to `c("blue", "red")`.
 #' @param label_moderator_outcome A Boolean indicating whether moderator -> mediator edges (significant moderated PIDEs) should be labeled with the name of the outcome they apply to. By default, `TRUE`.
 #' @param vertex.size A numeric for the size of the nodes in [igraph::plot.igraph()]; defaults to 10.
-#' @param vertex.label.size A numeric for the size of the labels in [igraph::plot.igraph()]; defaults to 0.75.
+#' @param vertex.label.cex A numeric for the size of the labels in [igraph::plot.igraph()]; defaults to 0.75.
+#' @param edge_alpha A numeric between 0 (fully transparent) and 1 (fully opaque) governing opacity of the graph's edges; defaults to 1
 #' @param ... Additional arguments passed through to [igraph::plot.igraph()] (e.g. `vertex.label.cex`, `edge.arrow.size`, `main`) for further customizing the rendered figure.
 #'
 #' @details
@@ -94,11 +95,13 @@
 #'
 #' @export
 hdmvm_plot_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, use_adj = TRUE, include_estimates = FALSE,
-                           color_arrows = FALSE, est_sign_colors = c("blue", "red"), vertex.size = 10, vertex.label.size = 0.75, ...){
+                           color_arrows = FALSE, est_sign_colors = c("blue", "red"), label_moderator_outcome = FALSE,
+                           vertex.size = 10, vertex.label.cex = 0.75, edge_alpha = 1, ...){
   if(!requireNamespace("igraph", quietly = TRUE)) stop("The `igraph` package is required by to_DAG(); please install it with install.packages('igraph').")
   if(!is.data.frame(mod_boot_summ)) stop("`mod_boot_summ` must be a data frame; the output from hdmvm_table() with DT_table = FALSE.")
   if(color_arrows && length(est_sign_colors) != 2) stop("`est_sign_colors` must be a length-2 character vector: c(<positive color>, <negative color>).")
   if(!all(c("Outcome","Estimand","Moderator","pval","pval_adj") %in% colnames(mod_boot_summ))) stop("`mod_boot_summ` does not look like hdmvm_table() output (DT_table = FALSE): missing expected columns.")
+  if(!is.numeric(edge_alpha) || length(edge_alpha) != 1 || is.na(edge_alpha) || edge_alpha < 0 || edge_alpha > 1) stop("`edge_alpha` must be a single numeric value between 0 and 1.")
 
   est_col <- "Orig. Est."
   if(!est_col %in% colnames(mod_boot_summ)) stop("`mod_boot_summ` is missing the '", est_col, "' column.")
@@ -244,8 +247,8 @@ hdmvm_plot_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, u
 
   igraph::plot.igraph(g, layout = layout_mat, vertex.shape = vshape[igraph::V(g)$type],
                       vertex.color = vcolor[igraph::V(g)$type], vertex.label = igraph::V(g)$name,
-                      vertex.label.color = "black", vertex.size = vertex.size, vertex.label.size = vertex.label.size,
-                      edge.lty = igraph::E(g)$lty, edge.color = igraph::E(g)$color,
+                      vertex.label.color = "black", vertex.size = vertex.size, vertex.label.cex = vertex.label.cex,
+                      edge.lty = igraph::E(g)$lty, edge.color = grDevices::adjustcolor(igraph::E(g)$color, alpha.f = edge_alpha),
                       edge.label = igraph::E(g)$label, edge.label.cex = 0.75,
                       edge.arrow.size = 0.6, edge.curved = 0.15, ...)
   graphics::legend("topleft", bty = "n", cex = 0.7,
