@@ -2,7 +2,7 @@
 #'
 #' `hdmvm_table()` converts the matrix output of the main [bootstrap_model()] function into a searchable/filterable html table using the `DT` package.
 #'
-#' @param mod_boot_summ A numeric matrix; the output from [bootstrap_model()]
+#' @param mod_boot A numeric matrix; the output from [bootstrap_model()]
 #' @param p An integer representing the number of candidate mediators
 #' @param outcomes A character vector with the names of each outcome
 #' @param p.adj.method A character string for the p-value correction method; see \link[stats]{p.adjust}. Defaults to `"BH"`.
@@ -30,7 +30,7 @@
 #'}
 #'
 #' @export
-hdmvm_table <- function(mod_boot_summ, p, outcomes, p.adj.method = "BH", DT_table = TRUE){
+hdmvm_table <- function(mod_boot, p, outcomes, p.adj.method = "BH", DT_table = TRUE){
   p.adj.method <- match.arg(p.adj.method)
 
   mod_boot_summ <- as.data.frame(mod_boot_summ)
