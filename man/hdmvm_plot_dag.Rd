@@ -14,6 +14,8 @@ hdmvm_plot_dag(
   include_estimates = FALSE,
   color_arrows = FALSE,
   est_sign_colors = c("blue", "red"),
+  vertex.size = 10,
+  vertex.label.size = 0.75,
   ...
 )
 }
@@ -36,7 +38,13 @@ hdmvm_plot_dag(
 
 \item{est_sign_colors}{A length-2 character vector of colors used for positive and negative estimates (in that order) when \code{color_arrows = TRUE}. Defaults to \code{c("blue", "red")}.}
 
+\item{vertex.size}{A numeric for the size of the nodes in \code{\link[igraph:plot.igraph]{igraph::plot.igraph()}}; defaults to 10.}
+
+\item{vertex.label.size}{A numeric for the size of the labels in \code{\link[igraph:plot.igraph]{igraph::plot.igraph()}}; defaults to 0.75.}
+
 \item{...}{Additional arguments passed through to \code{\link[igraph:plot.igraph]{igraph::plot.igraph()}} (e.g. \code{vertex.label.cex}, \code{edge.arrow.size}, \code{main}) for further customizing the rendered figure.}
+
+\item{label_moderator_outcome}{A Boolean indicating whether moderator -> mediator edges (significant moderated PIDEs) should be labeled with the name of the outcome they apply to. By default, \code{TRUE}.}
 }
 \value{
 Invisibly returns the underlying \code{igraph} graph object (with

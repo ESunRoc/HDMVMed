@@ -19,6 +19,9 @@
 #' @param include_estimates A Boolean indicating whether the effect estimates (the `` `Orig. Est.` `` column of [hdmvm_table()]) should be printed as edge labels. By default, `FALSE`.
 #' @param color_arrows A Boolean indicating whether arrows should be colored according to the sign of their associated estimate (positive vs. negative). By default, `FALSE`.
 #' @param est_sign_colors A length-2 character vector of colors used for positive and negative estimates (in that order) when `color_arrows = TRUE`. Defaults to `c("blue", "red")`.
+#' @param label_moderator_outcome A Boolean indicating whether moderator -> mediator edges (significant moderated PIDEs) should be labeled with the name of the outcome they apply to. By default, `TRUE`.
+#' @param vertex.size A numeric for the size of the nodes in [igraph::plot.igraph()]; defaults to 10.
+#' @param vertex.label.size A numeric for the size of the labels in [igraph::plot.igraph()]; defaults to 0.75.
 #' @param ... Additional arguments passed through to [igraph::plot.igraph()] (e.g. `vertex.label.cex`, `edge.arrow.size`, `main`) for further customizing the rendered figure.
 #'
 #' @details
@@ -90,10 +93,8 @@
 #'}
 #'
 #' @export
-hdmvm_plot_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, use_adj = TRUE,
-                           include_estimates = FALSE, color_arrows = FALSE,
-                           est_sign_colors = c("blue", "red"), ...){
-
+hdmvm_plot_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, use_adj = TRUE, include_estimates = FALSE,
+                           color_arrows = FALSE, est_sign_colors = c("blue", "red"), vertex.size = 10, vertex.label.size = 0.75, ...){
   if(!requireNamespace("igraph", quietly = TRUE)) stop("The `igraph` package is required by to_DAG(); please install it with install.packages('igraph').")
   if(!is.data.frame(mod_boot_summ)) stop("`mod_boot_summ` must be a data frame; the output from hdmvm_table() with DT_table = FALSE.")
   if(color_arrows && length(est_sign_colors) != 2) stop("`est_sign_colors` must be a length-2 character vector: c(<positive color>, <negative color>).")
@@ -121,8 +122,7 @@ hdmvm_plot_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, u
     warning("No mediators are significant at the chosen alpha; returning an (empty) treatment-only diagram.")
   }
 
-  # Mediator -> outcome edges: unmoderated-significant pairs, plus moderated-only-significant pairs
-  # for (mediator, outcome) combinations already in the diagram
+  # Mediator -> outcome edges: unmoderated-significant pairs, plus moderated-only- significant pairs for (mediator, outcome) combinations already in the diagram
   sig_pide_mod <- mod_boot_summ[is_sig & !is_unmoderated & is_pide &
                                   mod_boot_summ$Estimand %in% med_nodes &
                                   mod_boot_summ$Outcome %in% out_nodes,
@@ -180,7 +180,7 @@ hdmvm_plot_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, u
   edges <- data.frame(from = character(0), to = character(0), lty = character(0),
                       color = character(0), label = character(0), stringsAsFactors = FALSE)
 
-  # trt -> M : structural, plain
+  # trt -> M : structural, plain (never labeled/colored; see @details)
   if(length(med_nodes) > 0){
     edges <- rbind(edges, data.frame(from = trt_name, to = med_nodes, lty = "solid",
                                      color = "gray40", label = "", stringsAsFactors = FALSE))
@@ -204,10 +204,10 @@ hdmvm_plot_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, u
 
   # Z -> M : moderated PIDE overlay
   if(nrow(mod_pide_overlay) > 0){
-    lbl <- if(include_estimates){
-      paste0(mod_pide_overlay$Outcome, " (", fmt_est(mod_pide_overlay[[est_col]]), ")")
-    } else {
-      as.character(mod_pide_overlay$Outcome)
+    lbl <- if(label_moderator_outcome) as.character(mod_pide_overlay$Outcome) else rep("", nrow(mod_pide_overlay))
+    if(include_estimates){
+      est_lbl <- fmt_est(mod_pide_overlay[[est_col]])
+      lbl <- if(label_moderator_outcome) paste0(lbl, " (", est_lbl, ")") else est_lbl
     }
     col <- if(color_arrows) arrow_color(mod_pide_overlay[[est_col]]) else "gray50"
     edges <- rbind(edges, data.frame(from = mod_pide_overlay$Moderator, to = mod_pide_overlay$Estimand,
@@ -224,7 +224,7 @@ hdmvm_plot_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, u
 
   g <- igraph::graph_from_data_frame(edges, directed = TRUE, vertices = vertices)
 
-  # Layout: deterministic 4-column layout (trt | mediators | outcomes | moderators)
+  # Layout: (trt | mediators | outcomes | moderators)
   col_x <- c(trt = 0, mediator = 1, outcome = 2, moderator = 3)
   center_y <- function(k) if(k <= 1) 0 else seq((k - 1) / 2, -(k - 1) / 2, length.out = k)
 
@@ -242,19 +242,12 @@ hdmvm_plot_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, u
   op <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(op), add = TRUE)
 
-  igraph::plot.igraph(g, layout = layout_mat,
-                      vertex.shape = vshape[igraph::V(g)$type],
-                      vertex.color = vcolor[igraph::V(g)$type],
-                      vertex.label = igraph::V(g)$name,
-                      vertex.label.color = "black",
-                      vertex.size = 28,
-                      edge.lty = igraph::E(g)$lty,
-                      edge.color = igraph::E(g)$color,
-                      edge.label = igraph::E(g)$label,
-                      edge.label.cex = 0.75,
-                      edge.arrow.size = 0.6,
-                      edge.curved   = 0.15,
-                      ...)
+  igraph::plot.igraph(g, layout = layout_mat, vertex.shape = vshape[igraph::V(g)$type],
+                      vertex.color = vcolor[igraph::V(g)$type], vertex.label = igraph::V(g)$name,
+                      vertex.label.color = "black", vertex.size = vertex.size, vertex.label.size = vertex.label.size,
+                      edge.lty = igraph::E(g)$lty, edge.color = igraph::E(g)$color,
+                      edge.label = igraph::E(g)$label, edge.label.cex = 0.75,
+                      edge.arrow.size = 0.6, edge.curved = 0.15, ...)
   graphics::legend("topleft", bty = "n", cex = 0.7,
                    legend = c("mediated (M -> Y)", "direct effect (trt -> Y)", "moderation"),
                    lty = c("solid", "dashed", "dotted"), col = "gray30", seg.len = 2)
