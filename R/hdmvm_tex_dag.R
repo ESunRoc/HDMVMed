@@ -1,6 +1,6 @@
 #' Generate a tikz-cd DAG
 #'
-#' `hdmvm_dag` generates a DAG using the syntax of the `tikz-cd` LaTeX package.
+#' `hdmvm_tex_dag` generates a `tikz-cd` DAG using the syntax of the `tikz-cd` LaTeX package.
 #'
 #' @param mod_boot_summ A data frame; the output from [hdmvm_table()] with `DT_table = FALSE`.
 #' @param p An integer denoting the number of candidate mediators i.e., `ncol(mediators)`.
@@ -31,11 +31,11 @@
 #'                         outcomes = colnames(outcomes), DT_table = FALSE)
 #'
 #' ## Generate tikz-cd code
-#' cat(hdmvm_dag(model_df, p = ncol(mediators), q = ncol(outcomes)))
+#' cat(hdmvm_tex_dag(model_df, p = ncol(mediators), q = ncol(outcomes)))
 #'}
 #'
 #' @export
-hdmvm_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, use_adj = TRUE){
+hdmvm_tex_dag <- function(mod_boot_summ, p, q, trt_name = "trt", alpha = 0.1, use_adj = TRUE){
   if(use_adj){
     dag_matrix <- as.matrix(mod_boot_summ[which(mod_boot_summ$pval_adj[1:(q*p)]<=alpha),c("Outcome","Estimand")])
   } else {

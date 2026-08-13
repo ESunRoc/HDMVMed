@@ -1,6 +1,6 @@
 Package: HDMVMed
 Title: High-dimensional Multivariate Causal Mediation Model
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: 
     person("Eli", "Sun", , "eli_sun@urmc.rochester.edu", role = c("aut", "cre"))
 Description: Estimate the direct and indirect mediation effects with a set of high-dimensional mediators on a set of correlated, possibly high-dimensional, outcomes. Sun, E., Xiao, J., and Wu, T.T. (2025). Causal Mediation Analysis 	for Multiple Outcomes and High-dimensional Mediators: Identification, Inference, and Application. (Biometrics: 		In review).
@@ -9,5 +9,5 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Depends: R (>= 3.5)
-Imports: DT, MSGLasso, broom, coxed, doParallel, foreach, glmnet
+Imports: DT, MSGLasso, broom, coxed, doParallel, foreach, glmnet, igraph
 LazyData: true

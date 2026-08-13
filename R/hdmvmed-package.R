@@ -8,4 +8,5 @@
 #' @importFrom doParallel registerDoParallel
 #' @importFrom parallel detectCores makeCluster stopCluster
 #' @importFrom stats p.adjust lm quantile sd median setNames
+#' @import igraph
 NULL
