@@ -7,7 +7,7 @@
 hdmvm_table(mod_boot, p, outcomes, p.adj.method = "BH", DT_table = TRUE)
 }
 \arguments{
-\item{mod_boot}{A numeric matrix; the output from \code{\link[=bootstrap_model]{bootstrap_model()}}}
+\item{mod_boot}{A list; the output from \code{\link[=bootstrap_model]{bootstrap_model()}}}
 
 \item{p}{An integer representing the number of candidate mediators}
 

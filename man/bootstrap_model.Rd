@@ -95,7 +95,7 @@ to zero by the group-Lasso penalty. Ignored if \code{moderators} is \code{NULL}.
 \item{MediGrpEnds}{A vector of ending coordinates for the outcome groups. Equivalent to \code{G.Ends} from the \code{MSGLasso} package.}
 }
 \value{
-A \eqn{(1+r)(p q+2q)\times 8} matrix \code{mod_boot_summ} (\code{r} = \code{ncol(moderators)},
+A list containing \code{res} and \code{internals}. \code{res} is a \eqn{(1+r)(p q+2q)\times 8} matrix (\code{r} = \code{ncol(moderators)},
 or simply a \eqn{(p q+2q)\times 8} matrix if \code{moderators} is \code{NULL}, as before) with
 columns:
 \itemize{
@@ -107,6 +107,13 @@ columns:
 \item \code{bca_upperCL}: the upper limit of the \eqn{100(1-\texttt{alpha})\%} BCa CI;
 \item \code{per_lowerCL}: the lower limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI;
 \item \code{per_upperCL}: the upper limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI.
+\code{internals} is a list containing:
+\item \code{alpha_hat}, \code{phi_hat_d}, \code{xi_hat}, \code{eta_hat}, \code{tau_hat}: estimated coefficients
+\item \code{Sigma_M_hat}, \code{Sigma_Y_hat}: estimated covariance matrices for the mediators and outcomes;
+\item \code{Theta}: the nodewise regression debiasing matrix;
+\item \code{confounders}: the confounders adjusted for;
+\item \code{n}, \code{p}, \code{l}, \code{q}: the number of observations, mediators, confounders, and outcomes;
+\item \code{has_moderators}: a Boolean indicating whether moderators were included.
 }
 
 Row names identify the estimand as before (\code{"{mediator}_ide_resp{s}"},

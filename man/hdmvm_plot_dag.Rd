@@ -17,6 +17,7 @@ hdmvm_plot_dag(
   label_moderator_outcome = FALSE,
   vertex.size = 10,
   vertex.label.cex = 0.75,
+  edge_alpha = 1,
   ...
 )
 }
@@ -44,6 +45,8 @@ hdmvm_plot_dag(
 \item{vertex.size}{A numeric for the size of the nodes in \code{\link[igraph:plot.igraph]{igraph::plot.igraph()}}; defaults to 10.}
 
 \item{vertex.label.cex}{A numeric for the size of the labels in \code{\link[igraph:plot.igraph]{igraph::plot.igraph()}}; defaults to 0.75.}
+
+\item{edge_alpha}{A numeric between 0 (fully transparent) and 1 (fully opaque) governing opacity of the graph's edges; defaults to 1}
 
 \item{...}{Additional arguments passed through to \code{\link[igraph:plot.igraph]{igraph::plot.igraph()}} (e.g. \code{vertex.label.cex}, \code{edge.arrow.size}, \code{main}) for further customizing the rendered figure.}
 }

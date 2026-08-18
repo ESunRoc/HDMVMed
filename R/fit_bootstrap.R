@@ -35,7 +35,7 @@
 #' @param MediGrpStarts A vector of starting coordinates for the mediators groups. Equivalent to `G.Starts` from the `MSGLasso` package. Starts from 0 and runs to, at most, \eqn{p-1}.
 #' @param MediGrpEnds A vector of ending coordinates for the outcome groups. Equivalent to `G.Ends` from the `MSGLasso` package.
 #'
-#' @returns A \eqn{(1+r)(p q+2q)\times 8} matrix `mod_boot_summ` (`r` = `ncol(moderators)`,
+#' @returns A list containing `res` and `internals`. `res` is a \eqn{(1+r)(p q+2q)\times 8} matrix (`r` = `ncol(moderators)`,
 #'   or simply a \eqn{(p q+2q)\times 8} matrix if `moderators` is `NULL`, as before) with
 #'   columns:
 #' * `OrigEst`: the original PIDE/TIDE/DE (or moderated-PIDE/TIDE/DE) estimate;
@@ -46,6 +46,13 @@
 #' * `bca_upperCL`: the upper limit of the \eqn{100(1-\texttt{alpha})\%} BCa CI;
 #' * `per_lowerCL`: the lower limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI;
 #' * `per_upperCL`: the upper limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI.
+#' `internals` is a list containing:
+#' * `alpha_hat`, `phi_hat_d`, `xi_hat`, `eta_hat`, `tau_hat`: estimated coefficients
+#' * `Sigma_M_hat`, `Sigma_Y_hat`: estimated covariance matrices for the mediators and outcomes;
+#' * `Theta`: the nodewise regression debiasing matrix;
+#' * `confounders`: the confounders adjusted for;
+#' * `n`, `p`, `l`, `q`: the number of observations, mediators, confounders, and outcomes;
+#' * `has_moderators`: a Boolean indicating whether moderators were included.
 #'
 #' Row names identify the estimand as before (`"{mediator}_ide_resp{s}"`,
 #' `"TIDE_resp{s}"`, `"DE_resp{s}"`), with moderated-effect rows additionally tagged
@@ -202,6 +209,13 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
 
   mod_Stage1 <- trtToMedi_summ[which(trtToMedi_summ$term=="trt"),]
 
+  # Retain the stage-1 residual covariance and confounder loadings for sensitivity analysis.
+  # xi_hat is taken from coef() rather than the tidy frame so that row/column alignment is unambiguous.
+  Sigma_M_hat <- crossprod(residuals(trtToMedi))/n
+  coef_stage1 <- coef(trtToMedi)
+  xi_hat <- coef_stage1[grep("^confounders", rownames(coef_stage1)), , drop = FALSE]
+  rownames(xi_hat) <- colnames(confounders)
+
   if(has_moderators){
     # delta^M: p x r matrix of A x Z_r -> mediator_j coefficients (Stage-1 moderation)
     delta_M <- extract_interaction_estimates(trtToMedi_summ, "AxZ", colnames(AxZ), colnames(mediators))
@@ -257,7 +271,6 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   # written as `if(!is.null(ncol(Pen_L)))`/`ncol(Pen_G)`. This naming discrepancy causes an error if
   # `Pen_L`/`Pen_G` don't exist in the global environment of the user.
   Pen_L <<- matrix(rep(1, P*Q), P, Q, byrow=T)
-
   Pen_G <<- matrix(rep(1,G*R),G,R, byrow=TRUE)
 
   if(penalize_conf == FALSE){ # if penalize_conf == FALSE,
@@ -314,6 +327,14 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   mod_Stage2_debiased <- mod_Stage2$Beta + (1/n)*theta_mod%*%t(X_design)%*%(outcomes - X_design%*%mod_Stage2$Beta)
   mod_Stage2_all <- mod_Stage2_debiased
   rownames(mod_Stage2_all) <- c(colnames(mediators), colnames(confounders), "Exposure", if(has_moderators) colnames(AxZ))
+
+  # Retain the stage-2 residual covariance and confounder-to-outcome loadings.
+  # Likewise, Sigma_Y_hat uses the raw (penalized, non-debiased) Beta
+  Sigma_Y_hat <- crossprod(outcomes - X_design %*% mod_Stage2$Beta)/n
+  dimnames(Sigma_Y_hat) <- list(colnames(outcomes), colnames(outcomes))
+  eta_hat <- mod_Stage2$Beta[(p+1):(p+l), , drop = FALSE]
+  dimnames(eta_hat) <- list(colnames(confounders), colnames(outcomes))
+
 
   #### DE and PIDEs
   trt_row_idx <- p + l + 1
@@ -505,5 +526,23 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
                                "per_lowerCL", "per_upperCL")
   mod_boot_summ[is.nan(mod_boot_summ)] <- 0
 
-  return(mod_boot_summ)
+  alpha_hat <- mod_Stage1$estimate
+  names(alpha_hat) <- colnames(mediators)
+
+  # MSGLasso's Beta carries no column names, so set them explicitly rather than
+  # relying on what propagated through the debiasing arithmetic.
+  phi_hat_d <- mod_Stage2_all[1:p, , drop = FALSE]
+  dimnames(phi_hat_d) <- list(colnames(mediators), colnames(outcomes))
+  tau_hat <- mod_DE; names(tau_hat) <- colnames(outcomes)
+
+  internals <- list(alpha_hat = alpha_hat, Sigma_M_hat = Sigma_M_hat,
+                    Sigma_Y_hat = Sigma_Y_hat, phi_hat_d = phi_hat_d,
+                    Theta = theta_mod, xi_hat = xi_hat, eta_hat = eta_hat,
+                    tau_hat = tau_hat, confounders = confounders,
+                    n = n, p = p, l = l, q = q, has_moderators = has_moderators)
+
+  mod_boot <- list("res" = mod_boot_summ,
+                   "internals" = internals)
+
+  return(mod_boot)
 }
