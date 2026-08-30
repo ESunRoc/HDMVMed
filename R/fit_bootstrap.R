@@ -47,7 +47,7 @@
 #' * `per_lowerCL`: the lower limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI;
 #' * `per_upperCL`: the upper limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI.
 #' `internals` is a list containing:
-#' * `alpha_hat`, `phi_hat_d`, `xi_hat`, `eta_hat`, `tau_hat`: estimated coefficients
+#' * `alpha_hat`, `phi_hat`, `phi_hat_d`, `xi_hat`, `eta_hat`, `tau_hat`: estimated coefficients
 #' * `Sigma_M_hat`, `Sigma_Y_hat`: estimated covariance matrices for the mediators and outcomes;
 #' * `Theta`: the nodewise regression debiasing matrix;
 #' * `confounders`: the confounders adjusted for;
@@ -419,6 +419,7 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
                                     grp_Norm0, MSGLassolam1, MSGLassolamG.m)
     mod_stage2_boot_all <- mod_stage2_boot_fit$Beta + (1/n) * theta_mod %*% t(X_design_boot) %*%
       (outcomes_boot - X_design_boot %*% mod_stage2_boot_fit$Beta)
+    phi_hat <- modstage2_boot_fit$Beta[1:p,,drop=FALSE]
 
     # mod_stage2_boot_debiased <- mod_stage2_boot_fit$Beta[1:p,] + (1/n) * theta_mod %*% t(mediators) %*% (outcomes - mediators %*% mod_stage2_boot_fit$Beta[1:p,])
     # mod_stage2_boot_all <- rbind(mod_stage2_boot_debiased, mod_stage2_boot_fit$Beta[(p+1):nrow(mod_stage2_boot_fit$Beta),])
@@ -536,7 +537,8 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   tau_hat <- mod_DE; names(tau_hat) <- colnames(outcomes)
 
   internals <- list(alpha_hat = alpha_hat, Sigma_M_hat = Sigma_M_hat,
-                    Sigma_Y_hat = Sigma_Y_hat, phi_hat_d = phi_hat_d,
+                    Sigma_Y_hat = Sigma_Y_hat, phi_hat = phi_hat,
+                    phi_hat_d = phi_hat_d,
                     Theta = theta_mod, xi_hat = xi_hat, eta_hat = eta_hat,
                     tau_hat = tau_hat, confounders = confounders,
                     n = n, p = p, l = l, q = q, has_moderators = has_moderators)
