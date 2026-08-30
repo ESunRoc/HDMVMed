@@ -419,7 +419,6 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
                                     grp_Norm0, MSGLassolam1, MSGLassolamG.m)
     mod_stage2_boot_all <- mod_stage2_boot_fit$Beta + (1/n) * theta_mod %*% t(X_design_boot) %*%
       (outcomes_boot - X_design_boot %*% mod_stage2_boot_fit$Beta)
-    phi_hat <- modstage2_boot_fit$Beta[1:p,,drop=FALSE]
 
     # mod_stage2_boot_debiased <- mod_stage2_boot_fit$Beta[1:p,] + (1/n) * theta_mod %*% t(mediators) %*% (outcomes - mediators %*% mod_stage2_boot_fit$Beta[1:p,])
     # mod_stage2_boot_all <- rbind(mod_stage2_boot_debiased, mod_stage2_boot_fit$Beta[(p+1):nrow(mod_stage2_boot_fit$Beta),])
@@ -534,6 +533,9 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   # relying on what propagated through the debiasing arithmetic.
   phi_hat_d <- mod_Stage2_all[1:p, , drop = FALSE]
   dimnames(phi_hat_d) <- list(colnames(mediators), colnames(outcomes))
+
+  phi_hat <- mod_Stage2$Beta[1:p, , drop = FALSE]
+  dimnames(phi_hat) <- list(colnames(mediators), colnames(outcomes))
   tau_hat <- mod_DE; names(tau_hat) <- colnames(outcomes)
 
   internals <- list(alpha_hat = alpha_hat, Sigma_M_hat = Sigma_M_hat,

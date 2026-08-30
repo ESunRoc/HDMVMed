@@ -108,7 +108,7 @@ columns:
 \item \code{per_lowerCL}: the lower limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI;
 \item \code{per_upperCL}: the upper limit of the \eqn{100(1-\texttt{alpha})\%} percentile CI.
 \code{internals} is a list containing:
-\item \code{alpha_hat}, \code{phi_hat_d}, \code{xi_hat}, \code{eta_hat}, \code{tau_hat}: estimated coefficients
+\item \code{alpha_hat}, \code{phi_hat}, \code{phi_hat_d}, \code{xi_hat}, \code{eta_hat}, \code{tau_hat}: estimated coefficients
 \item \code{Sigma_M_hat}, \code{Sigma_Y_hat}: estimated covariance matrices for the mediators and outcomes;
 \item \code{Theta}: the nodewise regression debiasing matrix;
 \item \code{confounders}: the confounders adjusted for;
