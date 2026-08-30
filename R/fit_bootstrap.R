@@ -542,7 +542,8 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
                     Sigma_Y_hat = Sigma_Y_hat, phi_hat = phi_hat,
                     phi_hat_d = phi_hat_d,
                     Theta = theta_mod, xi_hat = xi_hat, eta_hat = eta_hat,
-                    tau_hat = tau_hat, confounders = confounders,
+                    tau_hat = tau_hat, mediators = mediators, trt = trt,
+                    outcomes = outcomes, confounders = confounders,
                     n = n, p = p, l = l, q = q, has_moderators = has_moderators)
 
   mod_boot <- list("res" = mod_boot_summ,
