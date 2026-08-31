@@ -111,9 +111,10 @@ columns:
 \item \code{alpha_hat}, \code{phi_hat}, \code{phi_hat_d}, \code{xi_hat}, \code{eta_hat}, \code{tau_hat}: estimated coefficients
 \item \code{Sigma_M_hat}, \code{Sigma_Y_hat}: estimated covariance matrices for the mediators and outcomes;
 \item \code{Theta}: the nodewise regression debiasing matrix;
-\item \code{confounders}: the confounders adjusted for;
+\item \code{mediators}, \code{trt}, \code{outcomes}, \code{confounders}: the mediators/treatment/outcomes/confounders used;
 \item \code{n}, \code{p}, \code{l}, \code{q}: the number of observations, mediators, confounders, and outcomes;
-\item \code{has_moderators}: a Boolean indicating whether moderators were included.
+\item \code{has_moderators}: a Boolean indicating whether moderators were included;
+\item \code{MSGLassolam1}, \code{MSGLassolamG}: the regularization parameters chosen for the MSGLasso fit.
 }
 
 Row names identify the estimand as before (\code{"{mediator}_ide_resp{s}"},

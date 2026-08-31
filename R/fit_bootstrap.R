@@ -50,9 +50,10 @@
 #' * `alpha_hat`, `phi_hat`, `phi_hat_d`, `xi_hat`, `eta_hat`, `tau_hat`: estimated coefficients
 #' * `Sigma_M_hat`, `Sigma_Y_hat`: estimated covariance matrices for the mediators and outcomes;
 #' * `Theta`: the nodewise regression debiasing matrix;
-#' * `confounders`: the confounders adjusted for;
+#' * `mediators`, `trt`, `outcomes`, `confounders`: the mediators/treatment/outcomes/confounders used;
 #' * `n`, `p`, `l`, `q`: the number of observations, mediators, confounders, and outcomes;
-#' * `has_moderators`: a Boolean indicating whether moderators were included.
+#' * `has_moderators`: a Boolean indicating whether moderators were included;
+#' * `MSGLassolam1`, `MSGLassolamG`: the regularization parameters chosen for the MSGLasso fit.
 #'
 #' Row names identify the estimand as before (`"{mediator}_ide_resp{s}"`,
 #' `"TIDE_resp{s}"`, `"DE_resp{s}"`), with moderated-effect rows additionally tagged
@@ -544,7 +545,8 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
                     Theta = theta_mod, xi_hat = xi_hat, eta_hat = eta_hat,
                     tau_hat = tau_hat, mediators = mediators, trt = trt,
                     outcomes = outcomes, confounders = confounders,
-                    n = n, p = p, l = l, q = q, has_moderators = has_moderators)
+                    n = n, p = p, l = l, q = q, has_moderators = has_moderators,
+                    MSGLassolam1 = MSGLassolam1,  MSGLassolamG = MSGLassolamG)
 
   mod_boot <- list("res" = mod_boot_summ,
                    "internals" = internals)
