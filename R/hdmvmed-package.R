@@ -7,6 +7,7 @@
 #' @importFrom foreach `%dopar%` foreach
 #' @importFrom doParallel registerDoParallel
 #' @importFrom parallel detectCores makeCluster stopCluster
-#' @importFrom stats p.adjust lm quantile sd median setNames
+#' @importFrom stats p.adjust lm quantile sd median setNames coef residuals
+#' @importFrom graphics abline legend points text
 #' @import igraph
 NULL
