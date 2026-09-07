@@ -18,9 +18,9 @@ hdmvm_sens_r2_convert(R2, R2_M, to = c("partial", "marginal"))
 A numeric of the same length as \code{R2}.
 }
 \description{
-The default outcome-side parameter, \eqn{R^2_Y(k)}, is the \emph{marginal}
-association of the confounder with the outcome residual (in keeping with Imai,
-Keele, and Yamamoto (2010)). Cinelli and Hazlett (2020) instead use the \emph{partial}
+The outcome-side parameter of this framework, \eqn{R^2_Y(k)}, is the \emph{marginal}
+association of the confounder with the outcome residual --- the convention of Imai,
+Keele, and Yamamoto (2010). Cinelli and Hazlett (2020) instead use the \emph{partial}
 association given the included regressors, which here means conditioning on the
 mediators. The two differ whenever \eqn{R^2_M>0}, since the confounder is correlated
 with the mediators. \code{hdmvm_sens_r2_convert()} provides a map between the two.

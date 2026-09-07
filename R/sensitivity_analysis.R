@@ -16,7 +16,13 @@
 #'  Options are `"plugin"`, `"crossfit"`, or `"both"`; defaults to `"both"`. See details.
 #' @param signal_const A minimum-signal threshold  \eqn{\theta_n = c\sqrt{s\log(pq)/n}};
 #'   defaults to 1. This should be varied as part of any report; see [hdmvm_sens_signal_sensitivity()].
-#' @param sel_quantile The quantile for selection robustness values; defaults to 0.1.
+#' @param report_only A Boolean. If `TRUE` (the default), the erosion robustness values are
+#'   computed over *reported findings* -- pairs that are both selected and whose interval
+#'   excludes zero -- rather than over every selected pair. Restricting in this way matters
+#'   whenever the penalty is loose: a selected set dominated by pairs with
+#'   \eqn{|\hat\phi^d| < \theta_n} drives both the minimum and any low quantile to zero, so
+#'   the unrestricted statistic reports the fragility of coefficients no analyst would
+#'   present. The unrestricted values are returned alongside as `RV_erode_all`.
 #' @param crossfit_folds Number of folds for the cross-fitted \eqn{R^2_{A\sim M}}.
 #' @param seed Seed for the cross-fitting split.
 #'
@@ -29,23 +35,22 @@
 #'   * `meta` -- dimensions, thresholds, and settings.
 #'
 #' @details
-#' The sensitivity framework has three main pieces: the sensitivity parameters, robustness values, and the design scalar.
-#'
-#' The sensitivity parameters are two bounded numbers characterizing a hypothesized single unmeasured confounder:
-#' \eqn{R^2_M}, the population \eqn{R^2} from regressing \eqn{Z} on the mediator residuals, shared across
-#' outcomes; and \eqn{R^2_Y(k)}, the fraction of outcome-\eqn{k} residual variance attributable to
+#' **The sensitivity parameters.** A hypothesized unmeasured confounder \eqn{Z},
+#' characterized by two bounded numbers: \eqn{R^2_M}, the population \eqn{R^2} from
+#' regressing \eqn{Z} on the mediator residuals, shared across outcomes; and
+#' \eqn{R^2_Y(k)}, the fraction of outcome-\eqn{k} residual variance attributable to
 #' \eqn{Z}. When \eqn{p=q=1} these collapse to the residual correlation of Imai and
 #' Yamamoto (2013) by \eqn{\rho = \pm\sqrt{R^2_MR^2_Y}}.
 #'
-#' The robustness values are reported on the symmetric scale \eqn{R^2_M = R^2_Y = RV}.
+#' **Robustness values.** Reported on the symmetric scale \eqn{R^2_M = R^2_Y = RV}.
 #' For an estimand with reported interval \eqn{[L,U]} and worst-case bias
 #' \eqn{\kappa\sqrt{R^2_MR^2_Y}}, the robustness value is
 #' \eqn{\min\{\min(|L|,|U|)/\kappa,\,1\}}. A value of 1 implies that no
 #' confounder of the assumed form can overturn the finding. For individual coefficients,
 #' this reduces to \eqn{(|t|-z)/\sqrt n}, free of any matrix quantity.
 #'
-#' And finally, the design scalar is the value \eqn{Q=R^2_{A\sim M}/[\sigma_A^2(1-R^2_{A\sim M})]},
-#' which governs the worst-case bias in every bound. A design in which the mediators nearly determine
+#' **The design scalar.** \eqn{Q=R^2_{A\sim M}/[\sigma_A^2(1-R^2_{A\sim M})]} governs the
+#' worst-case bias in every bound. A design in which the mediators nearly determine
 #' the exposure is intrinsically fragile. The plug-in estimator \eqn{\hat\alpha\hat\Theta_M\hat\alpha^\top}
 #' is upward biased (conservative) because \eqn{\hat\alpha} is dense; the cross-fitted estimator is
 #' downward biased (anti-conservative) through regularization shrinkage. `Q_method = "both"`, the default,
@@ -66,7 +71,7 @@
 #' }
 #' @references{
 #' Sun, E., Xiao, J., and Wu, T. T. (2026). Causal Mediation Analysis for Multiple
-#' Outcomes and High-dimensional Mediators, \emph{under review.}
+#' Outcomes and High-dimensional Mediators. \emph{Biostatistics}, under review.
 #' }
 #'
 #' @examples
@@ -85,7 +90,7 @@
 #' @export
 hdmvm_sens <- function(fit, mediators = NULL, trt = NULL, ci_type = c("bca", "percentile"), level = 0.95,
                        Q_method = c("both", "plugin", "crossfit"), signal_const = 1, sel_quantile = 0.1,
-                       crossfit_folds = 5, seed = 823543){
+                       report_only = TRUE, crossfit_folds = 5, seed = 823543){
 
   ci_type  <- match.arg(ci_type); Q_method <- match.arg(Q_method)
   if(is.null(fit$internals)){
@@ -148,7 +153,8 @@ hdmvm_sens <- function(fit, mediators = NULL, trt = NULL, ci_type = c("bca", "pe
   }
 
   ##### selection robustness #####
-  sel <- .hdmvm_selection_rv(int, n, p, q, mnames, onames, signal_const, sel_quantile)
+  sel <- .hdmvm_selection_rv(int, res, cols, n, p, q, mnames, onames, signal_const,
+                             sel_quantile, report_only)
 
   ##### benchmarking #####
   bench <- .hdmvm_benchmark(int, Theta_M, sigma_Yk, onames)
@@ -219,7 +225,7 @@ hdmvm_sens <- function(fit, mediators = NULL, trt = NULL, ci_type = c("bca", "pe
 
 
 ##### Cross-fitted linear-projection R^2 of A on M given U #####
-## The linear-projection R^2 is required even when A is binary; a logistic
+## NB: the linear-projection R^2 is required even when A is binary; a logistic
 ## pseudo-R^2 is a different functional and invalidates the identity Q = R2/(s2(1-R2)).
 .hdmvm_crossfit_R2 <- function(mediators, confounders, trt, folds = 5, seed = 823543){
   set.seed(seed)
@@ -245,14 +251,14 @@ hdmvm_sens <- function(fit, mediators = NULL, trt = NULL, ci_type = c("bca", "pe
 ##### Selection robustness values #####
 ## theta_n is the minimum-signal threshold. The bound on the entrywise bias is sqrt(n) * se_jk * sqrt(R2_M R2_Y),
 ## and se_jk = sqrt(sigma2_Yk*Theta_jj / n), so sqrt(n) * se_jk = sigma_Yk sqrt(Theta_jj)
-.hdmvm_selection_rv <- function(int, n, p, q, mnames, onames, signal_const,
-                                sel_quantile = 0.1){
+.hdmvm_selection_rv <- function(int, res, cols, n, p, q, mnames, onames, signal_const,
+                                sel_quantile = 0.1, report_only = TRUE){
   phi_d <- int$phi_hat_d
   Theta_M <- int$Theta[seq_len(p), seq_len(p), drop = FALSE]
   sigma_Yk <- sqrt(diag(int$Sigma_Y_hat))
   kap <- outer(sqrt(diag(Theta_M)), sigma_Yk)
 
-  ## Selected support; must come from the pre-debiased phi_hat
+  ## Selected support. This must come from the pre-debiased phi_hat
   if(is.null(int$phi_hat))
     stop("`internals$phi_hat` is missing. The selected support cannot be read from ",
          "`phi_hat_d`, which is dense by construction. Refit with a version of ",
@@ -262,7 +268,23 @@ hdmvm_sens <- function(fit, mediators = NULL, trt = NULL, ci_type = c("bca", "pe
   src <- "penalized_phi"
   theta_n <- signal_const * sqrt(max(s_hat, 1)*log(p*q)/n)
 
-  erode <- ifelse(S, pmax(abs(phi_d)-theta_n, 0) / kap, NA_real_)
+  ## Reported findings: selected AND interval excluding zero. A selected pair whose
+  ## interval covers zero is not something an analyst presents, so including it in an
+  ## erosion statistic asks how much confounding would unreport a non-finding. With a
+  ## loose penalty such pairs dominate the selected set, every one of them contributes an
+  ## erosion value of exactly zero, and both the minimum and any low quantile collapse.
+  Rep <- S
+  pide_rows <- paste0(rep(mnames, times = q), "_ide_resp", rep(seq_len(q), each = p))
+  if(report_only && all(pide_rows %in% rownames(res))){
+    a <- matrix(res[pide_rows, cols[1]], nrow = p, ncol = q)
+    b <- matrix(res[pide_rows, cols[2]], nrow = p, ncol = q)
+    lo <- pmin(a, b); hi <- pmax(a, b)
+    Rep <- S & !(lo <= 0 & hi >= 0)
+    if(!any(Rep)) Rep <- S                          # nothing reported: fall back
+  }
+
+  erode_all <- ifelse(S, pmax(abs(phi_d)-theta_n, 0) / kap, NA_real_)
+  erode <- ifelse(Rep, pmax(abs(phi_d)-theta_n, 0) / kap, NA_real_)
   spur <- ifelse(!S, pmax(theta_n-abs(phi_d), 0) / kap, NA_real_)
 
   wm <- function(m){
@@ -271,7 +293,7 @@ hdmvm_sens <- function(fit, mediators = NULL, trt = NULL, ci_type = c("bca", "pe
     list(rv = min(min(m, na.rm = TRUE), 1),
          which = c(mediator = mnames[i[1]], outcome = onames[i[2]]))
   }
-  e <- wm(erode); s <- wm(spur)
+  e <- wm(erode); ea <- wm(erode_all); s <- wm(spur)
   qtl <- function(m){
     v <- m[!is.na(m)]
     if(!length(v)) return(NA_real_)
@@ -281,12 +303,14 @@ hdmvm_sens <- function(fit, mediators = NULL, trt = NULL, ci_type = c("bca", "pe
   list(RV_erode = e$rv, which_erode = e$which,
        RV_spurious = s$rv, which_spurious = s$which,
        RV_erode_q = qtl(erode), RV_spurious_q = qtl(spur),
-       sel_quantile = sel_quantile,
+       RV_erode_all = ea$rv, RV_erode_all_q = qtl(erode_all),
+       sel_quantile = sel_quantile, report_only = report_only,
+       n_selected = sum(S), n_reported = sum(Rep),
        theta_n = theta_n, s_hat = s_hat, support_source = src)
 }
 
 
-##### Exact benchmark from the measured confounders #####
+##### Exact benchmark from the measured confounders (Proposition 5) #####
 .hdmvm_benchmark <- function(int, Theta_M, sigma_Yk, onames){
   if(is.null(int$xi_hat) || is.null(int$eta_hat) || is.null(int$confounders)) return(NULL)
   xi <- int$xi_hat; eta <- int$eta_hat
@@ -354,15 +378,8 @@ hdmvm_sens_bias <- function(s, R2_M, R2_Y){
 hdmvm_sens_signal_sensitivity <- function(fit, c_grid = c(0.25, 0.5, 1, 2, 4), ...){
   do.call(rbind, lapply(c_grid, function(cc){
     s <- hdmvm_sens(fit, signal_const = cc, ...)
-    sel <- s$selection
-    data.frame(c = cc, theta_n = sel$theta_n,
-               RV_erode = sel$RV_erode, RV_erode_q = sel$RV_erode_q,
-               RV_erode_all = sel$RV_erode_all,
-               RV_spurious = sel$RV_spurious, RV_spurious_q = sel$RV_spurious_q,
-               n_reported = sel$n_reported, n_selected = sel$n_selected,
-               frac_above = mean(abs(fit$internals$phi_hat_d[fit$internals$phi_hat != 0]) >
-                                   sel$theta_n),
-               row.names = NULL)
+    data.frame(c = cc, theta_n = s$selection$theta_n, RV_erode = s$selection$RV_erode,
+               RV_spurious = s$selection$RV_spurious, row.names = NULL)
   }))
 }
 
@@ -395,6 +412,10 @@ print.hdmvm_sens <- function(x, ...){
               paste(x$selection$which_spurious, collapse = " / ")))
   cat(sprintf("  at the %g quantile: erode = %.4f, spurious = %.4f\n",
               x$selection$sel_quantile, x$selection$RV_erode_q, x$selection$RV_spurious_q))
+  cat(sprintf("  erosion computed over %d %s of %d selected pairs (unrestricted: %.4f)\n",
+              x$selection$n_reported,
+              if(isTRUE(x$selection$report_only)) "reported" else "selected",
+              x$selection$n_selected, x$selection$RV_erode_all))
 
   if(!is.null(x$benchmark)){
     g <- max(x$benchmark$geo_mean, na.rm = TRUE)
@@ -466,7 +487,7 @@ plot.hdmvm_sens <- function(x, outcome = 1, estimand = c("TIDE", "DE"), ...){
 #'
 #' Per-outcome robustness values remain individually valid whatever this function
 #' reports as each is a correct statement about confounding of that outcome. What an
-#' infeasible verdict means is that the _vector_ describes a scenario no single confounder
+#' infeasible verdict means is that the *vector* describes a scenario no single confounder
 #' can produce, and so is jointly over-pessimistic if presented as one narrative.
 #'
 #' @examples
@@ -515,9 +536,9 @@ hdmvm_sens_feasible <- function(s, R2_Y, signs = NULL){
 
 #' Convert between marginal and partial outcome-side sensitivity parameters
 #'
-#' The default outcome-side parameter, \eqn{R^2_Y(k)}, is the _marginal_
-#' association of the confounder with the outcome residual (in keeping with Imai,
-#' Keele, and Yamamoto (2010)). Cinelli and Hazlett (2020) instead use the _partial_
+#' The outcome-side parameter of this framework, \eqn{R^2_Y(k)}, is the _marginal_
+#' association of the confounder with the outcome residual --- the convention of Imai,
+#' Keele, and Yamamoto (2010). Cinelli and Hazlett (2020) instead use the _partial_
 #' association given the included regressors, which here means conditioning on the
 #' mediators. The two differ whenever \eqn{R^2_M>0}, since the confounder is correlated
 #' with the mediators. `hdmvm_sens_r2_convert()` provides a map between the two.

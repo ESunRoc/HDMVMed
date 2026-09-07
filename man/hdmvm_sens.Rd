@@ -13,6 +13,7 @@ hdmvm_sens(
   Q_method = c("both", "plugin", "crossfit"),
   signal_const = 1,
   sel_quantile = 0.1,
+  report_only = TRUE,
   crossfit_folds = 5,
   seed = 823543
 )
@@ -36,7 +37,13 @@ Options are \code{"plugin"}, \code{"crossfit"}, or \code{"both"}; defaults to \c
 \item{signal_const}{A minimum-signal threshold  \eqn{\theta_n = c\sqrt{s\log(pq)/n}};
 defaults to 1. This should be varied as part of any report; see \code{\link[=hdmvm_sens_signal_sensitivity]{hdmvm_sens_signal_sensitivity()}}.}
 
-\item{sel_quantile}{The quantile for selection robustness values; defaults to 0.1.}
+\item{report_only}{A Boolean. If \code{TRUE} (the default), the erosion robustness values are
+computed over \emph{reported findings} -- pairs that are both selected and whose interval
+excludes zero -- rather than over every selected pair. Restricting in this way matters
+whenever the penalty is loose: a selected set dominated by pairs with
+\eqn{|\hat\phi^d| < \theta_n} drives both the minimum and any low quantile to zero, so
+the unrestricted statistic reports the fragility of coefficients no analyst would
+present. The unrestricted values are returned alongside as \code{RV_erode_all}.}
 
 \item{crossfit_folds}{Number of folds for the cross-fitted \eqn{R^2_{A\sim M}}.}
 
@@ -59,23 +66,22 @@ It returns robustness values for every reported estimand, the selection robustne
 values, and the benchmark values implied by the measured confounders.
 }
 \details{
-The sensitivity framework has three main pieces: the sensitivity parameters, robustness values, and the design scalar.
-
-The sensitivity parameters are two bounded numbers characterizing a hypothesized single unmeasured confounder:
-\eqn{R^2_M}, the population \eqn{R^2} from regressing \eqn{Z} on the mediator residuals, shared across
-outcomes; and \eqn{R^2_Y(k)}, the fraction of outcome-\eqn{k} residual variance attributable to
+\strong{The sensitivity parameters.} A hypothesized unmeasured confounder \eqn{Z},
+characterized by two bounded numbers: \eqn{R^2_M}, the population \eqn{R^2} from
+regressing \eqn{Z} on the mediator residuals, shared across outcomes; and
+\eqn{R^2_Y(k)}, the fraction of outcome-\eqn{k} residual variance attributable to
 \eqn{Z}. When \eqn{p=q=1} these collapse to the residual correlation of Imai and
 Yamamoto (2013) by \eqn{\rho = \pm\sqrt{R^2_MR^2_Y}}.
 
-The robustness values are reported on the symmetric scale \eqn{R^2_M = R^2_Y = RV}.
+\strong{Robustness values.} Reported on the symmetric scale \eqn{R^2_M = R^2_Y = RV}.
 For an estimand with reported interval \eqn{[L,U]} and worst-case bias
 \eqn{\kappa\sqrt{R^2_MR^2_Y}}, the robustness value is
 \eqn{\min\{\min(|L|,|U|)/\kappa,\,1\}}. A value of 1 implies that no
 confounder of the assumed form can overturn the finding. For individual coefficients,
 this reduces to \eqn{(|t|-z)/\sqrt n}, free of any matrix quantity.
 
-And finally, the design scalar is the value \eqn{Q=R^2_{A\sim M}/[\sigma_A^2(1-R^2_{A\sim M})]},
-which governs the worst-case bias in every bound. A design in which the mediators nearly determine
+\strong{The design scalar.} \eqn{Q=R^2_{A\sim M}/[\sigma_A^2(1-R^2_{A\sim M})]} governs the
+worst-case bias in every bound. A design in which the mediators nearly determine
 the exposure is intrinsically fragile. The plug-in estimator \eqn{\hat\alpha\hat\Theta_M\hat\alpha^\top}
 is upward biased (conservative) because \eqn{\hat\alpha} is dense; the cross-fitted estimator is
 downward biased (anti-conservative) through regularization shrinkage. \code{Q_method = "both"}, the default,
@@ -112,7 +118,7 @@ Sensitivity Analysis for Causal Mediation Effects. \emph{Statistical Science},
 
 {
 Sun, E., Xiao, J., and Wu, T. T. (2026). Causal Mediation Analysis for Multiple
-Outcomes and High-dimensional Mediators, \emph{under review.}
+Outcomes and High-dimensional Mediators. \emph{Biostatistics}, under review.
 }
 }
 \seealso{
