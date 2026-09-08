@@ -153,8 +153,7 @@ hdmvm_sens <- function(fit, mediators = NULL, trt = NULL, ci_type = c("bca", "pe
   }
 
   ##### selection robustness #####
-  sel <- .hdmvm_selection_rv(int, res, cols, n, p, q, mnames, onames, signal_const,
-                             sel_quantile, report_only)
+  sel <- .hdmvm_selection_rv(int, res, cols, n, p, q, mnames, onames, signal_const, sel_quantile, report_only)
 
   ##### benchmarking #####
   bench <- .hdmvm_benchmark(int, Theta_M, sigma_Yk, onames)

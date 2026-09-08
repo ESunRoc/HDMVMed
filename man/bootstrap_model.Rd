@@ -71,7 +71,7 @@ the exposure effect; defaults to \code{NULL} (no moderated-mediation analysis). 
 
 \item{boot_cores}{An integer denoting the number of logical cores to use when \code{boot_parallel = TRUE}. Defaults to \code{max(1,detectCores()-1)}}
 
-\item{penalize_conf}{A Boolean indicator for whether the confounder block should be unpenalized. By default, this is \code{FALSE}.}
+\item{penalize_conf}{A Boolean indicator for whether the confounder block should be unpenalized. By default, this is \code{TRUE}.}
 
 \item{penalize_moderators}{A Boolean indicator for whether the treatment x moderator
 interaction block should be unpenalized. By default, this is \code{FALSE}, so that

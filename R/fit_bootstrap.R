@@ -21,7 +21,7 @@
 #' @param theta_folds An integer denoting the number of CV folds used in the nodewise regressions underlying the debiasing matrix; passed through to [theta_calc()]/[theta_calc_parallel()]. Defaults to 5.
 #' @param boot_parallel A Boolean indicator for whether the `nB` bootstrap replicates, the dominant cost, should be computed in parallel via `doParallel`/`foreach`. By default, this is `TRUE`.
 #' @param boot_cores An integer denoting the number of logical cores to use when `boot_parallel = TRUE`. Defaults to `max(1,detectCores()-1)`
-#' @param penalize_conf A Boolean indicator for whether the confounder block should be unpenalized. By default, this is `FALSE`.
+#' @param penalize_conf A Boolean indicator for whether the confounder block should be unpenalized. By default, this is `TRUE`.
 #' @param penalize_moderators A Boolean indicator for whether the treatment x moderator
 #'   interaction block should be unpenalized. By default, this is `FALSE`, so that
 #'   moderated effects are always estimated and reported rather than possibly shrunk
@@ -274,9 +274,13 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   Pen_L <<- matrix(rep(1, P*Q), P, Q, byrow=T)
   Pen_G <<- matrix(rep(1,G*R),G,R, byrow=TRUE)
 
-  if(penalize_conf == FALSE){ # if penalize_conf == FALSE,
-    Pen_L[(p+1):(p+l+k),] <- 0            # don't penalize the confounders (incl. moderator main effects) or treatment
-    Pen_G[c(conf_grp_row, trt_grp_row),] <- 0 # don't penalize confounder group or treatment group
+  trt_col <- p + l + k
+  Pen_L[trt_col, ] <- 0
+  Pen_G[trt_grp_row, ] <- 0
+
+  if(penalize_conf == FALSE){
+    Pen_L[p + seq_len(l), ] <- 0
+    Pen_G[conf_grp_row, ] <- 0
   }
   if(has_moderators && !penalize_moderators){ # if penalize_moderators == FALSE (the default),
     Pen_L[(p+l+k+1):P,] <- 0    # don't penalize the treatment x moderator interaction columns
@@ -306,7 +310,10 @@ bootstrap_model <- function(mediators, confounders, trt, outcomes, moderators = 
   MSGLassolam1 <- mod_try.cv$lams.c[which.min(as.vector(mod_try.cv$rss.cv))][[1]]$lam1
   MSGLassolamG <- mod_try.cv$lams.c[which.min(as.vector(mod_try.cv$rss.cv))][[1]]$lam3
   MSGLassolamG.m <- matrix(rep(MSGLassolamG, G*R),G,R,byrow=TRUE)
-  MSGLassolamG.m[c(conf_grp_row, trt_grp_row),] <- 0
+
+  MSGLassolamG.m[trt_grp_row, ] <- 0
+  if(penalize_conf == FALSE) MSGLassolamG.m[conf_grp_row, ] <- 0
+
   if(has_moderators && !penalize_moderators) MSGLassolamG.m[modint_grp_row,] <- 0
 
   mod_Stage2 <- MSGLasso(X.m = X_design,
