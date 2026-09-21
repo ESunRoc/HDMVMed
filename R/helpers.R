@@ -206,7 +206,7 @@ theta_calc_parallel <- function(X, cores = parallel::detectCores()-1, folds = 5)
     lasso_j <- glmnet::cv.glmnet(x = X[,-j], y = X[,j], nfolds = folds, intercept = F, standardize = TRUE)
 
     Chat_j <- numeric(ncol(X))
-    Chat_j[-j] <- lasso_j$glmnet.fit$beta[,lasso_j$index[1,]]
+    Chat_j[-j] <- -lasso_j$glmnet.fit$beta[,lasso_j$index[1,]]
     Chat_j[j] <- 1
 
     lambda_min <- lasso_j$lambda.min
